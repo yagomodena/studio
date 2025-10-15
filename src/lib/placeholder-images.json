@@ -1,3 +1,34 @@
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "hero-background",
+      "description": "Abstract background for hero section",
+      "imageUrl": "https://picsum.photos/seed/hero/1920/1080",
+      "imageHint": "abstract workspace"
+    },
+    {
+      "id": "feature-sales",
+      "description": "Image for sales feature",
+      "imageUrl": "https://picsum.photos/seed/sales/500/300",
+      "imageHint": "sales chart"
+    },
+    {
+      "id": "feature-inventory",
+      "description": "Image for inventory feature",
+      "imageUrl": "https://picsum.photos/seed/inventory/500/300",
+      "imageHint": "warehouse boxes"
+    },
+    {
+      "id": "feature-finance",
+      "description": "Image for finance feature",
+      "imageUrl": "https://picsum.photos/seed/finance/500/300",
+      "imageHint": "calculator money"
+    },
+    {
+      "id": "feature-orders",
+      "description": "Image for orders feature",
+      "imageUrl": "https://picsum.photos/seed/orders/500/300",
+      "imageHint": "delivery package"
+    }
+  ]
 }

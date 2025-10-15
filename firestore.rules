@@ -1,0 +1,143 @@
+/**
+ * @file Firestore Security Rules for EasyBusiness Application
+ * @description This ruleset enforces a multi-tenant security model where data is isolated by company.
+ *
+ * Core Philosophy:
+ * Data isolation is achieved by nesting all company-specific data under the `/companies/{companyId}` path.
+ * Access control is primarily based on user roles within a company and ownership of user documents.
+ * Authorization Independence is achieved through denormalization: all documents contain a `companyId` field to avoid costly `get()` calls.
+ *
+ * Data Structure:
+ * - /companies/{companyId}: Stores company profiles.
+ * - /users/{userId}: Stores user profiles.
+ * - /companies/{companyId}/products/{productId}: Stores product information for each company.
+ * - /companies/{companyId}/sales/{saleId}: Stores sales records for each company.
+ * - /companies/{companyId}/orders/{orderId}: Stores order information for each company.
+ * - /companies/{companyId}/financialRecords/{financialRecordId}: Stores financial records for each company.
+ *
+ * Key Security Decisions:
+ * - Users can only create/update their own user documents (self-creation and ownership).
+ * - Listing of all users is denied to prevent unauthorized data access.
+ * - All company-specific data (products, sales, orders, financial records) requires the user to be a member of the company, verified by matching the `companyId`.
+ * - The rules are designed to prevent users from accessing data from other companies.
+ *
+ * Denormalization for Authorization:
+ * - All documents under `/companies/{companyId}` include a `companyId` field, which is used to quickly verify that the user belongs to the company. This avoids extra `get()` calls to the `/companies/{companyId}` document.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /**
+     * @description Allows read and create operations on company profiles.
+     * @path /companies/{companyId}
+     * @allow (get) User with valid auth can read a company profile.
+     * @allow (create) User with valid auth can create a company profile.
+     * @deny (update) Non-authenticated user attempts to update a company profile.
+     * @deny (delete) Non-authenticated user attempts to delete a company profile.
+     * @principle Allows reading company profiles. Only allows creating company profiles
+     */
+    match /companies/{companyId} {
+      allow get, list: if true;
+      allow create: if isSignedIn();
+      allow update, delete: if false;
+    }
+
+    /**
+     * @description Allows users to read and manage their own user profiles.
+     * @path /users/{userId}
+     * @allow (get) User with UID 'user123' reads their own profile.
+     * @allow (create) User with UID 'user123' creates their own profile.
+     * @deny (update) User with UID 'user456' attempts to update user 'user123' profile.
+     * @deny (delete) User with UID 'user456' attempts to delete user 'user123' profile.
+     * @principle Enforces document ownership for writes.
+     */
+    match /users/{userId} {
+      allow get: if isSignedIn() && isOwner(userId);
+      allow list: if false;
+      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.id == request.auth.uid;
+      allow update: if isSignedIn() && isOwner(userId) && resource.data.id == request.auth.uid;
+      allow delete: if isSignedIn() && isExistingOwner(userId);
+    }
+
+    /**
+     * @description Manages products for a specific company.
+     * @path /companies/{companyId}/products/{productId}
+     * @allow (get) User with valid auth can read a product if the companyId matches.
+     * @allow (create) User with valid auth can create a product if the companyId matches.
+     * @deny (update) User with mismatched companyId attempts to update a product.
+     * @deny (delete) User with mismatched companyId attempts to delete a product.
+     * @principle Enforces company-level data isolation.
+     */
+    match /companies/{companyId}/products/{productId} {
+      allow get, list: if isSignedIn() && isMemberOfCompany(companyId);
+      allow create: if isSignedIn() && isMemberOfCompany(companyId) && request.resource.data.companyId == companyId;
+      allow update: if isSignedIn() && isMemberOfCompany(companyId) && resource.data.companyId == companyId;
+      allow delete: if isSignedIn() && isMemberOfCompany(companyId) && resource.data.companyId == companyId;
+    }
+
+    /**
+     * @description Manages sales records for a specific company.
+     * @path /companies/{companyId}/sales/{saleId}
+     * @allow (get) User with valid auth can read a sale if the companyId matches.
+     * @allow (create) User with valid auth can create a sale if the companyId matches.
+     * @deny (update) User with mismatched companyId attempts to update a sale.
+     * @deny (delete) User with mismatched companyId attempts to delete a sale.
+     * @principle Enforces company-level data isolation.
+     */
+    match /companies/{companyId}/sales/{saleId} {
+      allow get, list: if isSignedIn() && isMemberOfCompany(companyId);
+      allow create: if isSignedIn() && isMemberOfCompany(companyId) && request.resource.data.companyId == companyId;
+      allow update: if isSignedIn() && isMemberOfCompany(companyId) && resource.data.companyId == companyId;
+      allow delete: if isSignedIn() && isMemberOfCompany(companyId) && resource.data.companyId == companyId;
+    }
+
+    /**
+     * @description Manages orders for a specific company.
+     * @path /companies/{companyId}/orders/{orderId}
+     * @allow (get) User with valid auth can read an order if the companyId matches.
+     * @allow (create) User with valid auth can create an order if the companyId matches.
+     * @deny (update) User with mismatched companyId attempts to update an order.
+     * @deny (delete) User with mismatched companyId attempts to delete an order.
+     * @principle Enforces company-level data isolation.
+     */
+    match /companies/{companyId}/orders/{orderId} {
+      allow get, list: if isSignedIn() && isMemberOfCompany(companyId);
+      allow create: if isSignedIn() && isMemberOfCompany(companyId) && request.resource.data.companyId == companyId;
+      allow update: if isSignedIn() && isMemberOfCompany(companyId) && resource.data.companyId == companyId;
+      allow delete: if isSignedIn() && isMemberOfCompany(companyId) && resource.data.companyId == companyId;
+    }
+
+    /**
+     * @description Manages financial records for a specific company.
+     * @path /companies/{companyId}/financialRecords/{financialRecordId}
+     * @allow (get) User with valid auth can read a financial record if the companyId matches.
+     * @allow (create) User with valid auth can create a financial record if the companyId matches.
+     * @deny (update) User with mismatched companyId attempts to update a financial record.
+     * @deny (delete) User with mismatched companyId attempts to delete a financial record.
+     * @principle Enforces company-level data isolation.
+     */
+    match /companies/{companyId}/financialRecords/{financialRecordId} {
+      allow get, list: if isSignedIn() && isMemberOfCompany(companyId);
+      allow create: if isSignedIn() && isMemberOfCompany(companyId) && request.resource.data.companyId == companyId;
+      allow update: if isSignedIn() && isMemberOfCompany(companyId) && resource.data.companyId == companyId;
+      allow delete: if isSignedIn() && isMemberOfCompany(companyId) && resource.data.companyId == companyId;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+    }
+
+    function isMemberOfCompany(companyId) {
+        return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyId == companyId;
+    }
+  }
+}

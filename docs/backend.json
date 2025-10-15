@@ -1,0 +1,339 @@
+{
+  "entities": {
+    "Company": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Company",
+      "type": "object",
+      "description": "Represents a company using the EasyBusiness system.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the company."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the company."
+        },
+        "subscriptionPlan": {
+          "type": "string",
+          "description": "The subscription plan of the company (e.g., Standard, Plus)."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "subscriptionPlan"
+      ]
+    },
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user of the EasyBusiness system.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the user."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the user."
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address of the user.",
+          "format": "email"
+        },
+        "companyId": {
+          "type": "string",
+          "description": "Reference to Company. (Relationship: Company 1:N User). The company the user belongs to."
+        },
+        "role": {
+          "type": "string",
+          "description": "Role of the user within the company (e.g., admin, standard)."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "email",
+        "companyId",
+        "role"
+      ]
+    },
+    "Product": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Product",
+      "type": "object",
+      "description": "Represents a product in the stock control system.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the product."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the product."
+        },
+        "quantity": {
+          "type": "number",
+          "description": "Quantity of the product in stock."
+        },
+        "price": {
+          "type": "number",
+          "description": "Price of the product."
+        },
+        "companyId": {
+          "type": "string",
+          "description": "Reference to Company. (Relationship: Company 1:N Product). The company that owns the product."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "quantity",
+        "price",
+        "companyId"
+      ]
+    },
+    "Sale": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Sale",
+      "type": "object",
+      "description": "Represents a sale record.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the sale."
+        },
+        "productIds": {
+          "type": "array",
+          "description": "References to Products. (Relationship: Sale N:N Product). List of product IDs included in the sale.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "totalValue": {
+          "type": "number",
+          "description": "Total value of the sale."
+        },
+        "customer": {
+          "type": "string",
+          "description": "Customer associated with the sale."
+        },
+        "status": {
+          "type": "string",
+          "description": "Status of the sale (e.g., pending, completed)."
+        },
+        "companyId": {
+          "type": "string",
+          "description": "Reference to Company. (Relationship: Company 1:N Sale). The company that made the sale."
+        }
+      },
+      "required": [
+        "id",
+        "productIds",
+        "totalValue",
+        "customer",
+        "status",
+        "companyId"
+      ]
+    },
+    "Order": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Order",
+      "type": "object",
+      "description": "Represents a customer order.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the order."
+        },
+        "productIds": {
+          "type": "array",
+          "description": "References to Products. (Relationship: Order N:N Product). List of product IDs included in the order.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "customer": {
+          "type": "string",
+          "description": "Customer who placed the order."
+        },
+        "status": {
+          "type": "string",
+          "description": "Status of the order (e.g., pending, processing, shipped)."
+        },
+        "companyId": {
+          "type": "string",
+          "description": "Reference to Company. (Relationship: Company 1:N Order). The company that received the order."
+        }
+      },
+      "required": [
+        "id",
+        "productIds",
+        "customer",
+        "status",
+        "companyId"
+      ]
+    },
+    "FinancialRecord": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "FinancialRecord",
+      "type": "object",
+      "description": "Represents a financial record (income or expense).",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the financial record."
+        },
+        "type": {
+          "type": "string",
+          "description": "Type of financial record (e.g., income, expense)."
+        },
+        "value": {
+          "type": "number",
+          "description": "Value of the financial record."
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of the financial record."
+        },
+        "companyId": {
+          "type": "string",
+          "description": "Reference to Company. (Relationship: Company 1:N FinancialRecord). The company associated with the financial record."
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "value",
+        "description",
+        "companyId"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "companies/{companyId}",
+        "definition": {
+          "entityName": "Company",
+          "schema": {
+            "$ref": "#/backend/entities/Company"
+          },
+          "description": "Stores company information. The `companyId` is used to isolate data for each company.",
+          "params": [
+            {
+              "name": "companyId",
+              "description": "Unique identifier for the company."
+            }
+          ]
+        }
+      },
+      {
+        "path": "users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Stores user information. Includes `companyId` to associate the user with a company and `role` for access control.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "Unique identifier for the user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "companies/{companyId}/products/{productId}",
+        "definition": {
+          "entityName": "Product",
+          "schema": {
+            "$ref": "#/backend/entities/Product"
+          },
+          "description": "Stores product information for a specific company. Includes denormalized `companyId` for authorization independence.",
+          "params": [
+            {
+              "name": "companyId",
+              "description": "Unique identifier for the company."
+            },
+            {
+              "name": "productId",
+              "description": "Unique identifier for the product."
+            }
+          ]
+        }
+      },
+      {
+        "path": "companies/{companyId}/sales/{saleId}",
+        "definition": {
+          "entityName": "Sale",
+          "schema": {
+            "$ref": "#/backend/entities/Sale"
+          },
+          "description": "Stores sales data for a specific company. Includes denormalized `companyId` for authorization independence.",
+          "params": [
+            {
+              "name": "companyId",
+              "description": "Unique identifier for the company."
+            },
+            {
+              "name": "saleId",
+              "description": "Unique identifier for the sale."
+            }
+          ]
+        }
+      },
+      {
+        "path": "companies/{companyId}/orders/{orderId}",
+        "definition": {
+          "entityName": "Order",
+          "schema": {
+            "$ref": "#/backend/entities/Order"
+          },
+          "description": "Stores order data for a specific company. Includes denormalized `companyId` for authorization independence.",
+          "params": [
+            {
+              "name": "companyId",
+              "description": "Unique identifier for the company."
+            },
+            {
+              "name": "orderId",
+              "description": "Unique identifier for the order."
+            }
+          ]
+        }
+      },
+      {
+        "path": "companies/{companyId}/financialRecords/{financialRecordId}",
+        "definition": {
+          "entityName": "FinancialRecord",
+          "schema": {
+            "$ref": "#/backend/entities/FinancialRecord"
+          },
+          "description": "Stores financial records (income/expense) for a specific company. Includes denormalized `companyId` for authorization independence.",
+          "params": [
+            {
+              "name": "companyId",
+              "description": "Unique identifier for the company."
+            },
+            {
+              "name": "financialRecordId",
+              "description": "Unique identifier for the financial record."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed to support a multi-tenant SaaS application ('EasyBusiness') with a focus on data isolation and role-based access control. Each company's data is stored under its own document ID, ensuring data isolation.  User roles are explicitly stored in the `User` document (`role` field), and access rules are based on matching the `companyId` field and the user's `role`. This approach achieves Authorization Independence by denormalizing the `companyId` onto every document (Products, Sales, Orders, FinancialRecords, Users). This eliminates the need for `get()` calls to parent documents, enabling atomic operations. The design leverages Structural Segregation by placing data related to different companies in separate subcollections under the `companies` collection and user-owned data in `users` subcollection. This ensures that all documents within a collection share the same security requirements.  QAPs (Rules are not Filters) are achieved by scoping queries within the company's documents or user's documents, preventing unauthorized data listing. For example, listing all products is done within the scope of a specific `companyId`, ensuring that only products belonging to that company are retrieved."
+  }
+}

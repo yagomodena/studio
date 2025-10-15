@@ -105,7 +105,7 @@ const chartConfig = {
 };
 
 export default function FinancePage() {
-  const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({});
+  const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date } | undefined>();
   const [customerFilter, setCustomerFilter] = useState('all');
   const [productFilter, setProductFilter] = useState('all');
 
@@ -116,8 +116,8 @@ export default function FinancePage() {
     return initialTransactions.filter((transaction) => {
       const transactionDate = new Date(transaction.date);
       const isDateInRange =
-        (!dateRange.from || transactionDate >= dateRange.from) &&
-        (!dateRange.to || transactionDate <= dateRange.to);
+        !dateRange?.from || transactionDate >= dateRange.from &&
+        !dateRange?.to || transactionDate <= dateRange.to;
       const isCustomerMatch =
         customerFilter === 'all' || transaction.customer === customerFilter;
       const isProductMatch =

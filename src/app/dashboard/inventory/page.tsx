@@ -51,6 +51,7 @@ import {
 type Product = {
   sku: string;
   name: string;
+  category: string;
   quantity: number;
   price: string;
   status: 'Em Estoque' | 'Estoque Baixo' | 'Fora de Estoque';
@@ -60,6 +61,7 @@ const initialProducts: Product[] = [
   {
     name: 'Laptop Pro',
     sku: 'LP-001',
+    category: 'Eletrônicos',
     quantity: 25,
     price: 'R$7500.00',
     status: 'Em Estoque',
@@ -67,6 +69,7 @@ const initialProducts: Product[] = [
   {
     name: 'Smartphone X',
     sku: 'SX-002',
+    category: 'Eletrônicos',
     quantity: 8,
     price: 'R$3200.00',
     status: 'Estoque Baixo',
@@ -74,6 +77,7 @@ const initialProducts: Product[] = [
   {
     name: 'Monitor 4K',
     sku: 'M4K-003',
+    category: 'Eletrônicos',
     quantity: 15,
     price: 'R$1800.00',
     status: 'Em Estoque',
@@ -81,6 +85,7 @@ const initialProducts: Product[] = [
   {
     name: 'Teclado Mecânico',
     sku: 'TM-004',
+    category: 'Periféricos',
     quantity: 50,
     price: 'R$450.00',
     status: 'Em Estoque',
@@ -88,6 +93,7 @@ const initialProducts: Product[] = [
   {
     name: 'Mouse Gamer',
     sku: 'MG-005',
+    category: 'Periféricos',
     quantity: 0,
     price: 'R$250.00',
     status: 'Fora de Estoque',
@@ -109,6 +115,7 @@ export default function InventoryPage() {
   const [formState, setFormState] = useState({
     name: '',
     sku: '',
+    category: '',
     quantity: 0,
     price: '',
   });
@@ -119,11 +126,12 @@ export default function InventoryPage() {
       setFormState({
         name: product.name,
         sku: product.sku,
+        category: product.category,
         quantity: product.quantity,
         price: product.price.replace('R$', '').replace('.', '').replace(',', '.'),
       });
     } else {
-      setFormState({ name: '', sku: '', quantity: 0, price: '' });
+      setFormState({ name: '', sku: '', category: '', quantity: 0, price: '' });
     }
     setIsDialogOpen(true);
   };
@@ -137,6 +145,7 @@ export default function InventoryPage() {
     const newProduct: Product = {
       name: formState.name,
       sku: editingProduct ? formState.sku : `PROD-${Date.now()}`,
+      category: formState.category,
       quantity: Number(formState.quantity),
       price: `R$${parseFloat(formState.price).toFixed(2).replace('.', ',')}`,
       status: getStatus(Number(formState.quantity)),
@@ -182,6 +191,7 @@ export default function InventoryPage() {
               <TableRow>
                 <TableHead>Produto</TableHead>
                 <TableHead>SKU</TableHead>
+                <TableHead>Categoria</TableHead>
                 <TableHead>Quantidade</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Preço</TableHead>
@@ -193,6 +203,7 @@ export default function InventoryPage() {
                 <TableRow key={product.sku}>
                   <TableCell className="font-medium">{product.name}</TableCell>
                   <TableCell>{product.sku}</TableCell>
+                  <TableCell>{product.category}</TableCell>
                   <TableCell>{product.quantity}</TableCell>
                   <TableCell>
                     <Badge
@@ -301,6 +312,18 @@ export default function InventoryPage() {
                   className="col-span-3"
                   required
                   disabled={!!editingProduct}
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="category" className="text-right">
+                  Categoria
+                </Label>
+                <Input
+                  id="category"
+                  value={formState.category}
+                  onChange={handleFormChange}
+                  className="col-span-3"
+                  required
                 />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">

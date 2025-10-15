@@ -15,7 +15,8 @@ import {
   Users,
   ClipboardList,
   FileText,
-  Settings
+  Settings,
+  Tags,
 } from "lucide-react";
 
 const navItems = [
@@ -23,6 +24,7 @@ const navItems = [
   { href: "/dashboard/sales", icon: <ShoppingCart />, label: "Vendas" },
   { href: "/dashboard/orders", icon: <ClipboardList />, label: "Pedidos" },
   { href: "/dashboard/inventory", icon: <Package />, label: "Estoque" },
+  { href: "/dashboard/categories", icon: <Tags />, label: "Categorias" },
   { href: "/dashboard/customers", icon: <Users />, label: "Clientes" },
   { href: "/dashboard/finance", icon: <DollarSign />, label: "Financeiro" },
   { href: "/dashboard/documents", icon: <FileText />, label: "Documentos" },
@@ -38,7 +40,7 @@ export function Nav() {
         <SidebarMenuItem key={item.href}>
           <Link href={item.href}>
             <SidebarMenuButton
-              isActive={pathname === item.href}
+              isActive={pathname.startsWith(item.href) && (item.href !== '/dashboard' || pathname === '/dashboard')}
               tooltip={item.label}
             >
               {item.icon}

@@ -24,7 +24,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogFooter,
   DialogClose,
 } from '@/components/ui/dialog';
@@ -45,8 +44,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 type Product = {
   sku: string;
@@ -55,6 +54,11 @@ type Product = {
   quantity: number;
   price: string;
   status: 'Em Estoque' | 'Estoque Baixo' | 'Fora de Estoque';
+};
+
+type Category = {
+  id: string;
+  name: string;
 };
 
 const initialProducts: Product[] = [
@@ -100,6 +104,12 @@ const initialProducts: Product[] = [
   },
 ];
 
+const initialCategories: Category[] = [
+    { id: 'CAT001', name: 'Eletrônicos' },
+    { id: 'CAT002', name: 'Periféricos' },
+    { id: 'CAT003', name: 'Acessórios' },
+];
+
 const getStatus = (
   quantity: number
 ): 'Em Estoque' | 'Estoque Baixo' | 'Fora de Estoque' => {
@@ -110,6 +120,7 @@ const getStatus = (
 
 export default function InventoryPage() {
   const [products, setProducts] = useState<Product[]>(initialProducts);
+  const [categories] = useState<Category[]>(initialCategories);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [formState, setFormState] = useState({
@@ -163,6 +174,10 @@ export default function InventoryPage() {
 
   const handleFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
+    setFormState((prev) => ({ ...prev, [id]: value }));
+  };
+
+  const handleSelectChange = (id: 'category', value: string) => {
     setFormState((prev) => ({ ...prev, [id]: value }));
   };
 
@@ -315,17 +330,26 @@ export default function InventoryPage() {
                 />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="category" className="text-right">
-                  Categoria
-                </Label>
-                <Input
-                  id="category"
-                  value={formState.category}
-                  onChange={handleFormChange}
-                  className="col-span-3"
-                  required
-                />
-              </div>
+                 <Label htmlFor="category" className="text-right">
+                   Categoria
+                 </Label>
+                 <Select
+                   value={formState.category}
+                   onValueChange={(value) => handleSelectChange('category', value)}
+                   required
+                 >
+                   <SelectTrigger className="col-span-3">
+                     <SelectValue placeholder="Selecione uma categoria" />
+                   </SelectTrigger>
+                   <SelectContent>
+                     {categories.map((category) => (
+                       <SelectItem key={category.id} value={category.name}>
+                         {category.name}
+                       </SelectItem>
+                     ))}
+                   </SelectContent>
+                 </Select>
+               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="quantity" className="text-right">
                   Qtd.

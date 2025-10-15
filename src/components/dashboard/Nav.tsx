@@ -23,6 +23,7 @@ const navItems = [
   { href: "/dashboard/sales", icon: <ShoppingCart />, label: "Vendas" },
   { href: "/dashboard/orders", icon: <ClipboardList />, label: "Pedidos" },
   { href: "/dashboard/inventory", icon: <Package />, label: "Estoque" },
+  { href: "/dashboard/customers", icon: <Users />, label: "Clientes" },
   { href: "/dashboard/finance", icon: <DollarSign />, label: "Financeiro" },
   { href: "/dashboard/documents", icon: <FileText />, label: "Documentos" },
   { href: "/dashboard/settings", icon: <Settings />, label: "Configurações" },

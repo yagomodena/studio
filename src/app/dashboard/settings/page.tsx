@@ -22,8 +22,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { PlusCircle } from 'lucide-react';
+import { PlusCircle, Trash2 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
 type Member = {
   id: string;
@@ -39,19 +40,40 @@ const initialMembers: Member[] = [
 
 export default function SettingsPage() {
   const [isMemberDialogOpen, setIsMemberDialogOpen] = useState(false);
+  const [editingMember, setEditingMember] = useState<Member | null>(null);
   const [members, setMembers] = useState<Member[]>(initialMembers);
-  const [newMember, setNewMember] = useState({ name: '', email: '', role: 'Membro' as Member['role'] });
+  const [formState, setFormState] = useState<Omit<Member, 'id'>>({ name: '', email: '', role: 'Membro' });
 
-  const handleAddMember = (e: React.FormEvent) => {
-    e.preventDefault();
-    const memberToAdd: Member = {
-      id: `user-${Date.now()}`,
-      ...newMember,
-    };
-    setMembers([...members, memberToAdd]);
-    setIsMemberDialogOpen(false);
-    setNewMember({ name: '', email: '', role: 'Membro' });
+  const openDialog = (member: Member | null = null) => {
+    setEditingMember(member);
+    if (member) {
+      setFormState({ name: member.name, email: member.email, role: member.role });
+    } else {
+      setFormState({ name: '', email: '', role: 'Membro' });
+    }
+    setIsMemberDialogOpen(true);
   };
+
+  const handleFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingMember) {
+      // Logic to edit member
+      setMembers(members.map(m => m.id === editingMember.id ? { ...formState, id: m.id } : m));
+    } else {
+      // Logic to add new member
+      const newMember: Member = {
+        id: `user-${Date.now()}`,
+        ...formState,
+      };
+      setMembers([newMember, ...members]);
+    }
+    setIsMemberDialogOpen(false);
+  };
+  
+  const handleDeleteMember = (id: string) => {
+    setMembers(members.filter(m => m.id !== id));
+  };
+
 
   return (
     <div className="space-y-6">
@@ -100,7 +122,7 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex justify-end">
-            <Button onClick={() => setIsMemberDialogOpen(true)}>
+            <Button onClick={() => openDialog()}>
               <PlusCircle className="mr-2 h-4 w-4" />
               Adicionar Membro
             </Button>
@@ -120,8 +142,30 @@ export default function SettingsPage() {
                   <TableCell>{member.name}</TableCell>
                   <TableCell>{member.email}</TableCell>
                   <TableCell>{member.role}</TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="ghost" size="sm">Editar</Button>
+                  <TableCell className="text-right space-x-2">
+                    <Button variant="outline" size="sm" onClick={() => openDialog(member)}>Editar</Button>
+                     <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="destructive" size="sm"><Trash2 className="h-4 w-4" /></Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Essa ação não pode ser desfeita. Isso irá remover o membro da sua equipe.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => handleDeleteMember(member.id)}
+                            className="bg-destructive hover:bg-destructive/90"
+                          >
+                            Excluir
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </TableCell>
                 </TableRow>
               ))}
@@ -145,9 +189,9 @@ export default function SettingsPage() {
       <Dialog open={isMemberDialogOpen} onOpenChange={setIsMemberDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Adicionar Novo Membro</DialogTitle>
+            <DialogTitle>{editingMember ? 'Editar Membro' : 'Adicionar Novo Membro'}</DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleAddMember}>
+          <form onSubmit={handleFormSubmit}>
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="new-member-name" className="text-right">
@@ -155,8 +199,8 @@ export default function SettingsPage() {
                 </Label>
                 <Input
                   id="new-member-name"
-                  value={newMember.name}
-                  onChange={(e) => setNewMember({ ...newMember, name: e.target.value })}
+                  value={formState.name}
+                  onChange={(e) => setFormState({ ...formState, name: e.target.value })}
                   className="col-span-3"
                   required
                 />
@@ -168,8 +212,8 @@ export default function SettingsPage() {
                 <Input
                   id="new-member-email"
                   type="email"
-                  value={newMember.email}
-                  onChange={(e) => setNewMember({ ...newMember, email: e.target.value })}
+                  value={formState.email}
+                  onChange={(e) => setFormState({ ...formState, email: e.target.value })}
                   className="col-span-3"
                   required
                 />
@@ -179,8 +223,8 @@ export default function SettingsPage() {
                   Cargo
                 </Label>
                 <Select
-                  value={newMember.role}
-                  onValueChange={(value: Member['role']) => setNewMember({ ...newMember, role: value })}
+                  value={formState.role}
+                  onValueChange={(value: Member['role']) => setFormState({ ...formState, role: value })}
                 >
                   <SelectTrigger className="col-span-3">
                     <SelectValue placeholder="Selecione um cargo" />
@@ -198,7 +242,7 @@ export default function SettingsPage() {
                   Cancelar
                 </Button>
               </DialogClose>
-              <Button type="submit">Adicionar</Button>
+              <Button type="submit">Salvar</Button>
             </DialogFooter>
           </form>
         </DialogContent>

@@ -45,6 +45,22 @@ type Order = {
   total: string;
 };
 
+type Customer = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  totalSpent: string;
+};
+
+const initialCustomers: Customer[] = [
+  { id: 'CUST001', name: 'Liam Johnson', email: 'liam@example.com', phone: '(11) 98765-4321', totalSpent: 'R$250.00' },
+  { id: 'CUST002', name: 'Olivia Smith', email: 'olivia@example.com', phone: '(21) 91234-5678', totalSpent: 'R$150.00' },
+  { id: 'CUST003', name: 'Noah Williams', email: 'noah@example.com', phone: '(31) 99999-8888', totalSpent: 'R$350.00' },
+  { id: 'CUST004', name: 'Emma Brown', email: 'emma@example.com', phone: '(41) 98888-7777', totalSpent: 'R$450.00' },
+  { id: 'CUST005', name: 'James Jones', email: 'james@example.com', phone: '(51) 97777-6666', totalSpent: 'R$550.00' },
+];
+
 const initialOrders: Order[] = [
   {
     id: 'ORD001',
@@ -85,6 +101,7 @@ const initialOrders: Order[] = [
 
 export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>(initialOrders);
+  const [customers] = useState<Customer[]>(initialCustomers);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [formState, setFormState] = useState({
     customer: '',
@@ -115,8 +132,8 @@ export default function OrdersPage() {
     setFormState((prev) => ({ ...prev, [id]: value }));
   };
 
-  const handleStatusChange = (value: Order['status']) => {
-    setFormState((prev) => ({ ...prev, status: value }));
+  const handleSelectChange = (id: 'customer' | 'status', value: string) => {
+    setFormState((prev) => ({ ...prev, [id]: value }));
   };
 
   return (
@@ -154,7 +171,7 @@ export default function OrdersPage() {
                 <TableRow key={order.id}>
                   <TableCell className="font-medium">{order.id}</TableCell>
                   <TableCell>{order.customer}</TableCell>
-                  <TableCell>{order.date}</TableCell>
+                  <TableCell>{new Date(order.date).toLocaleDateString('pt-BR')}</TableCell>
                   <TableCell>
                     <Badge
                       variant={
@@ -189,13 +206,21 @@ export default function OrdersPage() {
                 <Label htmlFor="customer" className="text-right">
                   Cliente
                 </Label>
-                <Input
-                  id="customer"
+                <Select
                   value={formState.customer}
-                  onChange={handleFormChange}
-                  className="col-span-3"
-                  required
-                />
+                  onValueChange={(value) => handleSelectChange('customer', value)}
+                >
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Selecione um cliente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {customers.map((customer) => (
+                      <SelectItem key={customer.id} value={customer.name}>
+                        {customer.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="total" className="text-right">
@@ -216,8 +241,8 @@ export default function OrdersPage() {
                   Status
                 </Label>
                 <Select
-                  onValueChange={handleStatusChange}
-                  defaultValue={formState.status}
+                  value={formState.status}
+                  onValueChange={(value) => handleSelectChange('status', value)}
                 >
                   <SelectTrigger className="col-span-3">
                     <SelectValue placeholder="Selecione um status" />
@@ -237,7 +262,7 @@ export default function OrdersPage() {
                   Cancelar
                 </Button>
               </DialogClose>
-              <Button type="submit">Salvar Pedido</Button>
+              <Button type="submit" disabled={!formState.customer || !formState.total}>Salvar Pedido</Button>
             </DialogFooter>
           </form>
         </DialogContent>

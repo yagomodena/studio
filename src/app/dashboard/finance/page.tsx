@@ -90,7 +90,8 @@ const initialTransactions = [
     product: 'Teclado Mecânico',
     customer: 'Noah Williams',
   },
-];
+].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
 
 const chartConfig = {
   receitas: {
@@ -126,19 +127,24 @@ export default function FinancePage() {
   }, [dateRange, customerFilter, productFilter]);
 
   const chartData = useMemo(() => {
+    const months = Array.from({length: 6}, (_, i) => format(new Date(new Date().setMonth(new Date().getMonth() - i)), 'MMM', { locale: ptBR })).reverse();
     const data: { [key: string]: { month: string; receitas: number; despesas: number } } = {};
+    
+    months.forEach(month => {
+      data[month] = { month, receitas: 0, despesas: 0 };
+    });
+
     filteredTransactions.forEach(t => {
       const month = format(new Date(t.date), 'MMM', { locale: ptBR });
-      if (!data[month]) {
-        data[month] = { month, receitas: 0, despesas: 0 };
-      }
-      if (t.type === 'Receita') {
-        data[month].receitas += t.amount;
-      } else {
-        data[month].despesas += Math.abs(t.amount);
+      if (data[month]) {
+          if (t.type === 'Receita') {
+            data[month].receitas += t.amount;
+          } else {
+            data[month].despesas += Math.abs(t.amount);
+          }
       }
     });
-    return Object.values(data).reverse();
+    return Object.values(data);
   }, [filteredTransactions]);
 
   return (
@@ -185,10 +191,10 @@ export default function FinancePage() {
                       <div className="bg-background p-2 shadow-lg rounded-lg border">
                         <p className="font-bold">{label}</p>
                         <p style={{ color: chartConfig.receitas.color }}>
-                          Receitas: {payload[0].value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          Receitas: {(payload[0].value as number).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                         </p>
                         <p style={{ color: chartConfig.despesas.color }}>
-                          Despesas: {payload[1].value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          Despesas: {(payload[1].value as number).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                         </p>
                       </div>
                     );

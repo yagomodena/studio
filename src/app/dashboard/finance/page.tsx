@@ -47,9 +47,9 @@ import { Calendar } from '@/components/ui/calendar';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 
-const initialTransactions = [
+const initialTransactionsData = [
   {
     date: '2023-11-23',
     description: 'Venda - Pedido #3124',
@@ -90,7 +90,7 @@ const initialTransactions = [
     product: 'Teclado Mecânico',
     customer: 'Noah Williams',
   },
-].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+];
 
 
 const chartConfig = {
@@ -105,12 +105,19 @@ const chartConfig = {
 };
 
 export default function FinancePage() {
+  const [initialTransactions, setInitialTransactions] = useState<typeof initialTransactionsData>([]);
   const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date } | undefined>();
   const [customerFilter, setCustomerFilter] = useState('all');
   const [productFilter, setProductFilter] = useState('all');
+  
+  useEffect(() => {
+    // Sort transactions once on the client to avoid hydration issues
+    const sortedTransactions = [...initialTransactionsData].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    setInitialTransactions(sortedTransactions);
+  }, []);
 
-  const customers = useMemo(() => ['all', ...new Set(initialTransactions.map(t => t.customer).filter(c => c !== 'N/A'))], []);
-  const products = useMemo(() => ['all', ...new Set(initialTransactions.map(t => t.product).filter(p => p !== 'N/A'))], []);
+  const customers = useMemo(() => ['all', ...new Set(initialTransactions.map(t => t.customer).filter(c => c !== 'N/A'))], [initialTransactions]);
+  const products = useMemo(() => ['all', ...new Set(initialTransactions.map(t => t.product).filter(p => p !== 'N/A'))], [initialTransactions]);
 
   const filteredTransactions = useMemo(() => {
     return initialTransactions.filter((transaction) => {
@@ -124,7 +131,7 @@ export default function FinancePage() {
         productFilter === 'all' || transaction.product === productFilter;
       return isDateInRange && isCustomerMatch && isProductMatch;
     });
-  }, [dateRange, customerFilter, productFilter]);
+  }, [initialTransactions, dateRange, customerFilter, productFilter]);
 
   const chartData = useMemo(() => {
     const months = Array.from({length: 6}, (_, i) => format(new Date(new Date().setMonth(new Date().getMonth() - i)), 'MMM', { locale: ptBR })).reverse();

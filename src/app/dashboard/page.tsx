@@ -1,22 +1,10 @@
+'use client';
+
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { DollarSign, ShoppingCart, Package, Users, BarChart } from "lucide-react";
+import { DollarSign, ShoppingCart, Package, Users } from "lucide-react";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { Bar, XAxis, YAxis, CartesianGrid, BarChart as RechartsBarChart } from "recharts";
-
-const chartData = [
-  { month: "Jan", total: Math.floor(Math.random() * 5000) + 1000 },
-  { month: "Fev", total: Math.floor(Math.random() * 5000) + 1000 },
-  { month: "Mar", total: Math.floor(Math.random() * 5000) + 1000 },
-  { month: "Abr", total: Math.floor(Math.random() * 5000) + 1000 },
-  { month: "Mai", total: Math.floor(Math.random() * 5000) + 1000 },
-  { month: "Jun", total: Math.floor(Math.random() * 5000) + 1000 },
-  { month: "Jul", total: Math.floor(Math.random() * 5000) + 1000 },
-  { month: "Ago", total: Math.floor(Math.random() * 5000) + 1000 },
-  { month: "Set", total: Math.floor(Math.random() * 5000) + 1000 },
-  { month: "Out", total: Math.floor(Math.random() * 5000) + 1000 },
-  { month: "Nov", total: Math.floor(Math.random() * 5000) + 1000 },
-  { month: "Dez", total: Math.floor(Math.random() * 5000) + 1000 },
-];
+import { useState, useEffect } from "react";
 
 const chartConfig = {
   total: {
@@ -26,6 +14,27 @@ const chartConfig = {
 };
 
 export default function DashboardPage() {
+  const [chartData, setChartData] = useState<any[]>([]);
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+    setChartData([
+      { month: "Jan", total: Math.floor(Math.random() * 5000) + 1000 },
+      { month: "Fev", total: Math.floor(Math.random() * 5000) + 1000 },
+      { month: "Mar", total: Math.floor(Math.random() * 5000) + 1000 },
+      { month: "Abr", total: Math.floor(Math.random() * 5000) + 1000 },
+      { month: "Mai", total: Math.floor(Math.random() * 5000) + 1000 },
+      { month: "Jun", total: Math.floor(Math.random() * 5000) + 1000 },
+      { month: "Jul", total: Math.floor(Math.random() * 5000) + 1000 },
+      { month: "Ago", total: Math.floor(Math.random() * 5000) + 1000 },
+      { month: "Set", total: Math.floor(Math.random() * 5000) + 1000 },
+      { month: "Out", total: Math.floor(Math.random() * 5000) + 1000 },
+      { month: "Nov", total: Math.floor(Math.random() * 5000) + 1000 },
+      { month: "Dez", total: Math.floor(Math.random() * 5000) + 1000 },
+    ]);
+  }, []);
+
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold font-headline">Dashboard</h1>
@@ -77,24 +86,26 @@ export default function DashboardPage() {
             <CardTitle className="font-headline">Visão Geral de Vendas</CardTitle>
           </CardHeader>
           <CardContent className="pl-2">
-            <ChartContainer config={chartConfig} className="min-h-[300px] w-full">
-              <RechartsBarChart data={chartData}>
-                <CartesianGrid vertical={false} />
-                <XAxis
-                  dataKey="month"
-                  tickLine={false}
-                  tickMargin={10}
-                  axisLine={false}
-                  tickFormatter={(value) => value.slice(0, 3)}
-                />
-                <YAxis />
-                <ChartTooltip
-                  cursor={false}
-                  content={<ChartTooltipContent indicator="dashed" />}
-                />
-                <Bar dataKey="total" fill="var(--color-total)" radius={4} />
-              </RechartsBarChart>
-            </ChartContainer>
+            {isClient && (
+              <ChartContainer config={chartConfig} className="min-h-[300px] w-full">
+                <RechartsBarChart data={chartData}>
+                  <CartesianGrid vertical={false} />
+                  <XAxis
+                    dataKey="month"
+                    tickLine={false}
+                    tickMargin={10}
+                    axisLine={false}
+                    tickFormatter={(value) => value.slice(0, 3)}
+                  />
+                  <YAxis />
+                  <ChartTooltip
+                    cursor={false}
+                    content={<ChartTooltipContent indicator="dashed" />}
+                  />
+                  <Bar dataKey="total" fill="var(--color-total)" radius={4} />
+                </RechartsBarChart>
+              </ChartContainer>
+            )}
           </CardContent>
         </Card>
         <Card className="col-span-4 lg:col-span-3">

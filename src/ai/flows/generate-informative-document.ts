@@ -12,22 +12,22 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const GenerateInformativeDocumentInputSchema = z.object({
-  companyName: z.string().describe('The name of the company.'),
-  customerName: z.string().describe('The name of the customer.'),
+  companyName: z.string().describe('O nome da empresa.'),
+  customerName: z.string().describe('O nome do cliente.'),
   products: z
     .array(z.object({
-      name: z.string().describe('The name of the product.'),
-      quantity: z.number().describe('The quantity of the product.'),
-      price: z.number().describe('The price of the product.'),
+      name: z.string().describe('O nome do produto.'),
+      quantity: z.number().describe('A quantidade do produto.'),
+      price: z.number().describe('O preço do produto.'),
     }))
-    .describe('The list of products purchased.'),
-  totalAmount: z.number().describe('The total amount of the sale.'),
-  date: z.string().describe('The date of the sale.'),
+    .describe('A lista de produtos comprados.'),
+  totalAmount: z.number().describe('O valor total da venda.'),
+  date: z.string().describe('A data da venda.'),
 });
 export type GenerateInformativeDocumentInput = z.infer<typeof GenerateInformativeDocumentInputSchema>;
 
 const GenerateInformativeDocumentOutputSchema = z.object({
-  documentText: z.string().describe('The generated informative document text.'),
+  documentText: z.string().describe('O texto do documento informativo gerado.'),
 });
 export type GenerateInformativeDocumentOutput = z.infer<typeof GenerateInformativeDocumentOutputSchema>;
 
@@ -41,22 +41,32 @@ const prompt = ai.definePrompt({
   name: 'generateInformativeDocumentPrompt',
   input: {schema: GenerateInformativeDocumentInputSchema},
   output: {schema: GenerateInformativeDocumentOutputSchema},
-  prompt: `You are an AI assistant specialized in generating informative sales documents, similar to a 'Nota Fiscal', for businesses.
+  prompt: `Você é um assistente de IA especializado em gerar documentos de vendas informativos, semelhante a uma 'Nota Fiscal', para empresas.
 
-  Generate a document based on the following information:
+  Gere um documento com base nas seguintes informações:
 
-  Company Name: {{{companyName}}}
-  Customer Name: {{{customerName}}}
-  Date: {{{date}}}
+  **Dados da Empresa:**
+  Nome: {{{companyName}}}
 
-  Products:
+  **Dados do Cliente:**
+  Nome: {{{customerName}}}
+  
+  **Detalhes da Transação:**
+  Data: {{{date}}}
+
+  **Produtos:**
   {{#each products}}
-  - Name: {{{name}}}, Quantity: {{{quantity}}}, Price: {{{price}}}
+  - Produto: {{{name}}}
+    Quantidade: {{{quantity}}}
+    Preço Unitário: R$ {{{price}}}
   {{/each}}
 
-  Total Amount: {{{totalAmount}}}
+  **Resumo Financeiro:**
+  Valor Total: R$ {{{totalAmount}}}
 
-  Ensure the document includes all provided details in a clear and organized manner. The document should look professional and be easy to understand.
+  Observação: Este documento não possui valor fiscal.
+  
+  Certifique-se de que o documento inclua todos os detalhes fornecidos de maneira clara e organizada. O documento deve parecer profissional e ser fácil de entender.
   `,
 });
 

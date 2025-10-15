@@ -54,6 +54,7 @@ export default function SettingsPage() {
   const [editingMember, setEditingMember] = useState<Member | null>(null);
   const [members, setMembers] = useState<Member[]>(initialMembers);
   const [roles] = useState<Role[]>(initialRoles);
+  const [companyName, setCompanyName] = useState('Sua Empresa LTDA');
   const [formState, setFormState] = useState<Omit<Member, 'id'>>({ name: '', email: '', role: 'Membro' });
 
   const openDialog = (member: Member | null = null) => {
@@ -119,7 +120,7 @@ export default function SettingsPage() {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="company-name">Nome da Empresa</Label>
-            <Input id="company-name" defaultValue="Sua Empresa LTDA" />
+            <Input id="company-name" value={companyName} onChange={(e) => setCompanyName(e.target.value)} />
           </div>
           <Button>Salvar Alterações</Button>
         </CardContent>

@@ -84,6 +84,7 @@ export default function SalesPage() {
   const [sales, setSales] = useState<Sale[]>(initialSales);
   const [customers] = useState<Customer[]>(initialCustomers);
   const [products] = useState<Product[]>(initialProducts);
+  const [companyName] = useState<string>('Sua Empresa LTDA');
   const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
   const [isDocumentDialogOpen, setIsDocumentDialogOpen] = useState(false);
   
@@ -156,7 +157,7 @@ export default function SalesPage() {
     setIsFormDialogOpen(false);
     
     const docInput = {
-        companyName: 'EasyBusiness',
+        companyName: companyName,
         customerName: newSale.customer,
         products: newSale.products,
         totalAmount: total,

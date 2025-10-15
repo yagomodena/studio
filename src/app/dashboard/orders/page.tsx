@@ -97,6 +97,7 @@ export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>(initialOrders);
   const [customers] = useState<Customer[]>(initialCustomers);
   const [products] = useState<Product[]>(initialProducts);
+  const [companyName] = useState<string>('Sua Empresa LTDA');
   const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
   const [isDocumentDialogOpen, setIsDocumentDialogOpen] = useState(false);
   
@@ -165,7 +166,7 @@ export default function OrdersPage() {
     setIsFormDialogOpen(false);
     
     const docInput = {
-        companyName: 'EasyBusiness',
+        companyName: companyName,
         customerName: newOrder.customer,
         products: newOrder.products,
         totalAmount: total,

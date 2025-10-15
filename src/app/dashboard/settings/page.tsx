@@ -30,18 +30,30 @@ type Member = {
   id: string;
   name: string;
   email: string;
-  role: 'Admin' | 'Membro';
+  role: string;
 };
+
+type Role = {
+  id: string;
+  name: string;
+  permissions: string[];
+}
 
 const initialMembers: Member[] = [
   { id: 'user-1', name: 'John Doe', email: 'john.doe@example.com', role: 'Admin' },
-  { id: 'user-2', name: 'Jane Smith', email: 'jane.smith@example.com', role: 'Membro' },
+  { id: 'user-2', name: 'Jane Smith', email: 'jane.smith@example.com', role: 'Vendedor' },
+];
+
+const initialRoles: Role[] = [
+    { id: 'role-1', name: 'Admin', permissions: ['all'] },
+    { id: 'role-2', name: 'Vendedor', permissions: ['dashboard', 'sales', 'orders', 'inventory', 'categories', 'customers', 'documents'] },
 ];
 
 export default function SettingsPage() {
   const [isMemberDialogOpen, setIsMemberDialogOpen] = useState(false);
   const [editingMember, setEditingMember] = useState<Member | null>(null);
   const [members, setMembers] = useState<Member[]>(initialMembers);
+  const [roles] = useState<Role[]>(initialRoles);
   const [formState, setFormState] = useState<Omit<Member, 'id'>>({ name: '', email: '', role: 'Membro' });
 
   const openDialog = (member: Member | null = null) => {
@@ -49,7 +61,7 @@ export default function SettingsPage() {
     if (member) {
       setFormState({ name: member.name, email: member.email, role: member.role });
     } else {
-      setFormState({ name: '', email: '', role: 'Membro' });
+      setFormState({ name: '', email: '', role: roles[0]?.name || '' });
     }
     setIsMemberDialogOpen(true);
   };
@@ -57,10 +69,8 @@ export default function SettingsPage() {
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (editingMember) {
-      // Logic to edit member
       setMembers(members.map(m => m.id === editingMember.id ? { ...formState, id: m.id } : m));
     } else {
-      // Logic to add new member
       const newMember: Member = {
         id: `user-${Date.now()}`,
         ...formState,
@@ -224,14 +234,15 @@ export default function SettingsPage() {
                 </Label>
                 <Select
                   value={formState.role}
-                  onValueChange={(value: Member['role']) => setFormState({ ...formState, role: value })}
+                  onValueChange={(value: string) => setFormState({ ...formState, role: value })}
                 >
                   <SelectTrigger className="col-span-3">
                     <SelectValue placeholder="Selecione um cargo" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Admin">Admin</SelectItem>
-                    <SelectItem value="Membro">Membro</SelectItem>
+                    {roles.map((role) => (
+                      <SelectItem key={role.id} value={role.name}>{role.name}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

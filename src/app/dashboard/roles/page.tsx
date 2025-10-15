@@ -61,7 +61,6 @@ const allPermissions = [
     { id: 'inventory', label: 'Estoque' },
     { id: 'categories', label: 'Categorias' },
     { id: 'customers', label: 'Clientes' },
-    { id: 'documents', label: 'Documentos' },
     { id: 'finance', label: 'Financeiro' },
     { id: 'roles', label: 'Cargos' },
     { id: 'settings', label: 'Configurações' },
@@ -69,7 +68,7 @@ const allPermissions = [
 
 const initialRoles: Role[] = [
     { id: 'role-1', name: 'Admin', permissions: ['all'] },
-    { id: 'role-2', name: 'Vendedor', permissions: ['dashboard', 'sales', 'orders', 'inventory', 'categories', 'customers', 'documents'] },
+    { id: 'role-2', name: 'Vendedor', permissions: ['dashboard', 'sales', 'orders', 'inventory', 'categories', 'customers'] },
 ];
 
 

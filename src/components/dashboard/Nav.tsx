@@ -14,7 +14,6 @@ import {
   DollarSign,
   Users,
   ClipboardList,
-  FileText,
   Settings,
   Tags,
   ShieldCheck,
@@ -35,7 +34,7 @@ const currentUser = {
 
 const allRoles: Role[] = [
     { id: 'role-1', name: 'Admin', permissions: ['all'] },
-    { id: 'role-2', name: 'Vendedor', permissions: ['dashboard', 'sales', 'orders', 'inventory', 'categories', 'customers', 'documents'] },
+    { id: 'role-2', name: 'Vendedor', permissions: ['dashboard', 'sales', 'orders', 'inventory', 'categories', 'customers'] },
 ];
 
 const navItems = [
@@ -45,7 +44,6 @@ const navItems = [
   { href: "/dashboard/inventory", slug: 'inventory', icon: <Package />, label: "Estoque" },
   { href: "/dashboard/categories", slug: 'categories', icon: <Tags />, label: "Categorias" },
   { href: "/dashboard/customers", slug: 'customers', icon: <Users />, label: "Clientes" },
-  { href: "/dashboard/documents", slug: 'documents', icon: <FileText />, label: "Documentos" },
   { href: "/dashboard/finance", slug: 'finance', icon: <DollarSign />, label: "Financeiro" },
   { href: "/dashboard/roles", slug: 'roles', icon: <ShieldCheck />, label: "Cargos" },
   { href: "/dashboard/settings", slug: 'settings', icon: <Settings />, label: "Configurações" },

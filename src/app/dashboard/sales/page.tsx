@@ -18,7 +18,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { PlusCircle } from 'lucide-react';
+import { PlusCircle, Trash2, Loader2, Printer, MessageSquare } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -36,6 +36,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { generateInformativeDocument, GenerateInformativeDocumentInput } from '@/ai/flows/generate-informative-document';
+
 
 type Sale = {
   id: string;
@@ -43,6 +45,7 @@ type Sale = {
   date: string;
   status: 'Concluída' | 'Pendente' | 'Cancelada';
   total: string;
+  products: { name: string; quantity: number; price: number }[];
 };
 
 type Customer = {
@@ -65,51 +68,81 @@ const initialCustomers: Customer[] = [
 ];
 
 const initialProducts: Product[] = [
-  { name: 'Laptop Pro', sku: 'LP-001', price: 'R$7500.00' },
-  { name: 'Smartphone X', sku: 'SX-002', price: 'R$3200.00' },
-  { name: 'Monitor 4K', sku: 'M4K-003', price: 'R$1800.00' },
-  { name: 'Teclado Mecânico', sku: 'TM-004', price: 'R$450.00' },
-  { name: 'Mouse Gamer', sku: 'MG-005', price: 'R$250.00' },
+  { name: 'Laptop Pro', sku: 'LP-001', price: '7500.00' },
+  { name: 'Smartphone X', sku: 'SX-002', price: '3200.00' },
+  { name: 'Monitor 4K', sku: 'M4K-003', price: '1800.00' },
+  { name: 'Teclado Mecânico', sku: 'TM-004', price: '450.00' },
+  { name: 'Mouse Gamer', sku: 'MG-005', price: '250.00' },
 ];
 
 const initialSales: Sale[] = [
-  { id: "SALE001", customer: "Liam Johnson", date: "2023-11-23", status: "Concluída", total: "R$250.00" },
-  { id: "SALE002", customer: "Olivia Smith", date: "2023-11-22", status: "Concluída", total: "R$150.00" },
-  { id: "SALE003", customer: "Noah Williams", date: "2023-11-21", status: "Pendente", total: "R$350.00" },
-  { id: "SALE004", customer: "Emma Brown", date: "2023-11-20", status: "Concluída", total: "R$450.00" },
-  { id: "SALE005", customer: "James Jones", date: "2023-11-19", status: "Cancelada", total: "R$550.00" },
+  { id: "SALE001", customer: "Liam Johnson", date: "2023-11-23", status: "Concluída", total: "R$250.00", products: [{ name: 'Mouse Gamer', quantity: 1, price: 250 }] },
+  { id: "SALE002", customer: "Olivia Smith", date: "2023-11-22", status: "Concluída", total: "R$150.00", products: [{ name: 'Teclado Mecânico', quantity: 1, price: 150 }] },
 ];
 
 export default function SalesPage() {
   const [sales, setSales] = useState<Sale[]>(initialSales);
   const [customers] = useState<Customer[]>(initialCustomers);
   const [products] = useState<Product[]>(initialProducts);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
+  const [isDocumentDialogOpen, setIsDocumentDialogOpen] = useState(false);
   
   const [formState, setFormState] = useState({
     customer: '',
-    product: '',
-    quantity: 1,
     status: 'Pendente' as Sale['status'],
+    products: [{ productId: '', quantity: 1 }],
   });
+  
+  const [generatedDocument, setGeneratedDocument] = useState<string | null>(null);
+  const [documentLoading, setDocumentLoading] = useState(false);
+  const [currentSale, setCurrentSale] = useState<GenerateInformativeDocumentInput | null>(null);
+
 
   const handleOpenDialog = () => {
     setFormState({
         customer: '',
-        product: '',
-        quantity: 1,
         status: 'Pendente',
+        products: [{ productId: '', quantity: 1 }],
       });
-    setIsDialogOpen(true);
+    setIsFormDialogOpen(true);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const selectedProduct = products.find(p => p.sku === formState.product);
-    if (!selectedProduct || !formState.customer) return;
+  const addProductField = () => {
+    setFormState(prev => ({
+      ...prev,
+      products: [...prev.products, { productId: '', quantity: 1 }],
+    }));
+  };
 
-    const priceAsNumber = parseFloat(selectedProduct.price.replace('R$', '').replace('.', '').replace(',', '.'));
-    const total = priceAsNumber * formState.quantity;
+  const removeProductField = (index: number) => {
+    setFormState(prev => ({
+      ...prev,
+      products: prev.products.filter((_, i) => i !== index),
+    }));
+  };
+
+  const handleProductChange = (index: number, field: 'productId' | 'quantity', value: string | number) => {
+    setFormState(prev => {
+      const newProducts = [...prev.products];
+      newProducts[index] = { ...newProducts[index], [field]: value };
+      return { ...prev, products: newProducts };
+    });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formState.customer || formState.products.some(p => !p.productId)) return;
+
+    const saleProducts = formState.products.map(p => {
+        const productDetails = products.find(prod => prod.sku === p.productId)!;
+        return {
+            name: productDetails.name,
+            quantity: Number(p.quantity),
+            price: parseFloat(productDetails.price),
+        };
+    });
+
+    const total = saleProducts.reduce((acc, p) => acc + (p.price * p.quantity), 0);
 
     const newSale: Sale = {
       id: `SALE${String(Date.now()).slice(-3)}`,
@@ -117,18 +150,57 @@ export default function SalesPage() {
       date: new Date().toLocaleDateString('pt-BR', { year: 'numeric', month: '2-digit', day: '2-digit' }).split('/').reverse().join('-'),
       status: formState.status,
       total: `R$${total.toFixed(2).replace('.', ',')}`,
+      products: saleProducts,
     };
     setSales([newSale, ...sales]);
-    setIsDialogOpen(false);
+    setIsFormDialogOpen(false);
+    
+    const docInput = {
+        companyName: 'EasyBusiness',
+        customerName: newSale.customer,
+        products: newSale.products,
+        totalAmount: total,
+        date: new Date(newSale.date).toLocaleDateString('pt-BR'),
+    };
+    
+    setCurrentSale(docInput);
+    setIsDocumentDialogOpen(true);
+    setDocumentLoading(true);
+
+    try {
+        const result = await generateInformativeDocument(docInput);
+        setGeneratedDocument(result.documentText);
+    } catch (error) {
+        console.error("Failed to generate document", error);
+        setGeneratedDocument("Erro ao gerar o documento.");
+    } finally {
+        setDocumentLoading(false);
+    }
   };
 
-  const handleSelectChange = (id: 'customer' | 'product' | 'status', value: string) => {
+  const handleSelectChange = (id: 'customer' | 'status', value: string) => {
     setFormState((prev) => ({ ...prev, [id]: value }));
   };
-  
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { id, value } = e.target;
-    setFormState((prev) => ({...prev, [id]: value }));
+
+  const handlePrint = () => {
+    const printWindow = window.open('', '', 'height=600,width=800');
+    if (printWindow) {
+      printWindow.document.write('<html><head><title>Documento da Venda</title>');
+      printWindow.document.write('<style>body { font-family: sans-serif; } pre { white-space: pre-wrap; word-wrap: break-word; }</style>');
+      printWindow.document.write('</head><body>');
+      printWindow.document.write(`<pre>${generatedDocument}</pre>`);
+      printWindow.document.write('</body></html>');
+      printWindow.document.close();
+      printWindow.print();
+    }
+  };
+
+  const handleWhatsApp = () => {
+    if (currentSale) {
+      const message = `Olá ${currentSale.customerName}, obrigado pela sua compra na ${currentSale.companyName}! Seguem os detalhes:\n\n${generatedDocument}\n\n`;
+      const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
+      window.open(whatsappUrl, '_blank');
+    }
   };
 
   return (
@@ -177,8 +249,8 @@ export default function SalesPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+      <Dialog open={isFormDialogOpen} onOpenChange={setIsFormDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Adicionar Nova Venda</DialogTitle>
           </DialogHeader>
@@ -205,49 +277,56 @@ export default function SalesPage() {
                 </Select>
               </div>
 
-               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="product" className="text-right">
-                  Produto
-                </Label>
-                <Select
-                  value={formState.product}
-                  onValueChange={(value) => handleSelectChange('product', value)}
-                >
-                  <SelectTrigger className="col-span-3">
-                    <SelectValue placeholder="Selecione um produto" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {products.map((product) => (
-                      <SelectItem key={product.sku} value={product.sku}>
-                        {product.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="quantity" className="text-right">
-                  Quantidade
-                </Label>
-                <Input
-                  id="quantity"
-                  type="number"
-                  min="1"
-                  value={formState.quantity}
-                  onChange={handleInputChange}
-                  className="col-span-3"
-                  required
-                />
-              </div>
+               {formState.products.map((product, index) => (
+                <div key={index} className="grid grid-cols-12 items-center gap-2">
+                  <Label className="col-span-12">Produto {index + 1}</Label>
+                  <div className="col-span-8">
+                     <Select
+                        value={product.productId}
+                        onValueChange={(value) => handleProductChange(index, 'productId', value)}
+                        >
+                        <SelectTrigger>
+                            <SelectValue placeholder="Selecione um produto" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {products.map((p) => (
+                            <SelectItem key={p.sku} value={p.sku}>
+                                {p.name}
+                            </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="col-span-3">
+                     <Input
+                        type="number"
+                        min="1"
+                        placeholder="Qtd."
+                        value={product.quantity}
+                        onChange={(e) => handleProductChange(index, 'quantity', parseInt(e.target.value))}
+                        required
+                    />
+                  </div>
+                  {formState.products.length > 1 && (
+                    <Button type="button" variant="destructive" size="icon" className="col-span-1" onClick={() => removeProductField(index)}>
+                        <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              ))}
 
-              <div className="grid grid-cols-4 items-center gap-4">
+              <Button type="button" variant="outline" size="sm" onClick={addProductField}>
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Adicionar outro produto
+              </Button>
+
+              <div className="grid grid-cols-4 items-center gap-4 mt-4">
                 <Label htmlFor="status" className="text-right">
                   Status
                 </Label>
                 <Select
                   value={formState.status}
-                  onValueChange={(value) => handleSelectChange('status', value)}
+                  onValueChange={(value) => handleSelectChange('status', value as Sale['status'])}
                 >
                   <SelectTrigger className="col-span-3">
                     <SelectValue placeholder="Selecione um status" />
@@ -266,9 +345,43 @@ export default function SalesPage() {
                   Cancelar
                 </Button>
               </DialogClose>
-              <Button type="submit" disabled={!formState.customer || !formState.product}>Salvar Venda</Button>
+              <Button type="submit" disabled={!formState.customer || formState.products.some(p => !p.productId)}>Salvar Venda</Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+      
+      <Dialog open={isDocumentDialogOpen} onOpenChange={setIsDocumentDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+                <DialogTitle>Documento da Venda Gerado</DialogTitle>
+            </DialogHeader>
+            <div className="py-4">
+                {documentLoading ? (
+                    <div className="flex justify-center items-center h-40">
+                        <Loader2 className="h-8 w-8 animate-spin text-accent" />
+                    </div>
+                ) : (
+                    <div className="prose prose-sm dark:prose-invert max-w-none bg-muted p-4 rounded-md">
+                        <pre className="whitespace-pre-wrap font-sans text-sm">{generatedDocument}</pre>
+                    </div>
+                )}
+            </div>
+            <DialogFooter className="gap-2 sm:gap-0">
+                <Button variant="outline" onClick={handlePrint} disabled={documentLoading}>
+                    <Printer className="mr-2 h-4 w-4" />
+                    Imprimir
+                </Button>
+                <Button onClick={handleWhatsApp} disabled={documentLoading} className="bg-green-500 hover:bg-green-600 text-white">
+                    <MessageSquare className="mr-2 h-4 w-4" />
+                    Enviar via WhatsApp
+                </Button>
+                 <DialogClose asChild>
+                    <Button type="button" variant="secondary">
+                    Fechar
+                    </Button>
+                </DialogClose>
+            </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

@@ -90,7 +90,7 @@ export default function SalesPage() {
   
   const [formState, setFormState] = useState({
     customer: '',
-    status: 'Pendente' as Sale['status'],
+    status: 'Concluída' as Sale['status'],
     products: [{ productId: '', quantity: 1 }],
   });
   
@@ -102,7 +102,7 @@ export default function SalesPage() {
   const handleOpenDialog = () => {
     setFormState({
         customer: '',
-        status: 'Pendente',
+        status: 'Concluída',
         products: [{ productId: '', quantity: 1 }],
       });
     setIsFormDialogOpen(true);
@@ -333,8 +333,8 @@ export default function SalesPage() {
                     <SelectValue placeholder="Selecione um status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Pendente">Pendente</SelectItem>
                     <SelectItem value="Concluída">Concluída</SelectItem>
+                    <SelectItem value="Pendente">Pendente</SelectItem>
                     <SelectItem value="Cancelada">Cancelada</SelectItem>
                   </SelectContent>
                 </Select>

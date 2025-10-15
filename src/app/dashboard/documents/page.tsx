@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { generateInformativeDocument } from '@/ai/flows/generate-informative-document';
 import { useState } from 'react';
-import { Loader2, PlusCircle, Trash2, Wand2 } from 'lucide-react';
+import { FileText, Loader2, PlusCircle, Trash2, Wand2 } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 
 const productSchema = z.object({

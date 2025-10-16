@@ -57,7 +57,7 @@ Empresa: {{{companyName}}}
 Cliente: {{{customerName}}}
 Data: {{{date}}}
 
---- PRODUTOS ---
+PRODUTOS
 {{#each products}}
 Item: {{{name}}}
 Quantidade: {{{quantity}}}
@@ -65,7 +65,7 @@ Preço Unitário: R$ {{{price}}}
 Total do Item: R$ {{multiply quantity price}}
 {{/each}}
 
---- RESUMO ---
+RESUMO
 Valor Total: R$ {{{totalAmount}}}
 
 Observação: Este documento é apenas informativo e **não possui valor fiscal**."

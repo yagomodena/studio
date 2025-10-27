@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -45,21 +45,39 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { PlusCircle, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
+import { collection, doc, serverTimestamp } from 'firebase/firestore';
+import { addDocumentNonBlocking, setDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { Skeleton } from '@/components/ui/skeleton';
 
 type Category = {
   id: string;
   name: string;
+  companyId: string;
 };
 
-const initialCategories: Category[] = [
-    { id: 'CAT001', name: 'Eletrônicos' },
-    { id: 'CAT002', name: 'Periféricos' },
-    { id: 'CAT003', name: 'Acessórios' },
-];
-
+type UserProfile = {
+    companyId: string;
+}
 
 export default function CategoriesPage() {
-    const [categories, setCategories] = useState<Category[]>(initialCategories);
+    const { user, isUserLoading } = useUser();
+    const firestore = useFirestore();
+
+    const userProfileRef = useMemoFirebase(() => {
+        if (!user) return null;
+        return doc(firestore, 'users', user.uid);
+    }, [firestore, user]);
+
+    const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
+
+    const categoriesRef = useMemoFirebase(() => {
+        if (!userProfile?.companyId) return null;
+        return collection(firestore, 'companies', userProfile.companyId, 'categories');
+    }, [firestore, userProfile]);
+
+    const { data: categories, isLoading: isLoadingCategories } = useCollection<Omit<Category, 'id'>>(categoriesRef);
+    
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [editingCategory, setEditingCategory] = useState<Category | null>(null);
     const [formState, setFormState] = useState({ name: '' });
@@ -75,22 +93,32 @@ export default function CategoriesPage() {
     };
 
     const handleDelete = (id: string) => {
-        setCategories(categories.filter((c) => c.id !== id));
+        if (!categoriesRef) return;
+        const categoryDocRef = doc(categoriesRef, id);
+        deleteDocumentNonBlocking(categoryDocRef);
     };
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        const newCategory: Category = {
-            id: editingCategory ? editingCategory.id : `CAT-${Date.now()}`,
-            name: formState.name,
+        if (!categoriesRef || !userProfile?.companyId) return;
+
+        const categoryData = {
+          name: formState.name,
+          companyId: userProfile.companyId,
         };
 
         if (editingCategory) {
-            setCategories(
-                categories.map((c) => (c.id === editingCategory.id ? newCategory : c))
-            );
+            const categoryDocRef = doc(categoriesRef, editingCategory.id);
+            setDocumentNonBlocking(categoryDocRef, {
+              ...editingCategory,
+              ...categoryData,
+              updatedAt: serverTimestamp(),
+            }, { merge: true });
         } else {
-            setCategories([newCategory, ...categories]);
+            addDocumentNonBlocking(categoriesRef, {
+              ...categoryData,
+              createdAt: serverTimestamp(),
+            });
         }
         setIsDialogOpen(false);
     };
@@ -99,6 +127,8 @@ export default function CategoriesPage() {
         const { id, value } = e.target;
         setFormState((prev) => ({ ...prev, [id]: value }));
     };
+    
+    const isLoading = isUserLoading || isProfileLoading || isLoadingCategories;
 
   return (
     <div className="space-y-6">
@@ -123,58 +153,73 @@ export default function CategoriesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {categories.map((category) => (
-                <TableRow key={category.id}>
-                  <TableCell className="font-medium">{category.name}</TableCell>
-                  <TableCell className="text-right">
-                  <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                          <span className="sr-only">Abrir menu</span>
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleOpenDialog(category)}>
-                          <Pencil className="mr-2 h-4 w-4" />
-                          Editar
-                        </DropdownMenuItem>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              className="w-full justify-start text-sm text-destructive hover:text-destructive px-2 py-1.5 font-normal"
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Excluir
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>
-                                Você tem certeza?
-                              </AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Essa ação não pode ser desfeita. Isso irá deletar
-                                permanentemente a categoria.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() => handleDelete(category.id)}
-                                className="bg-destructive hover:bg-destructive/90"
+              {isLoading ? (
+                Array.from({ length: 3 }).map((_, i) => (
+                  <TableRow key={i}>
+                    <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
+                  </TableRow>
+                ))
+              ) : categories && categories.length > 0 ? (
+                categories.map((category) => (
+                  <TableRow key={category.id}>
+                    <TableCell className="font-medium">{category.name}</TableCell>
+                    <TableCell className="text-right">
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" className="h-8 w-8 p-0">
+                            <span className="sr-only">Abrir menu</span>
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleOpenDialog(category)}>
+                            <Pencil className="mr-2 h-4 w-4" />
+                            Editar
+                          </DropdownMenuItem>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                className="w-full justify-start text-sm text-destructive hover:text-destructive px-2 py-1.5 font-normal"
                               >
+                                <Trash2 className="mr-2 h-4 w-4" />
                                 Excluir
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>
+                                  Você tem certeza?
+                                </AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Essa ação não pode ser desfeita. Isso irá deletar
+                                  permanentemente a categoria.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleDelete(category.id)}
+                                  className="bg-destructive hover:bg-destructive/90"
+                                >
+                                  Excluir
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                    <TableCell colSpan={2} className="text-center h-24">
+                        Nenhuma categoria encontrada.
+                    </TableCell>
                 </TableRow>
-              ))}
+              )}
             </TableBody>
           </Table>
         </CardContent>
@@ -216,3 +261,5 @@ export default function CategoriesPage() {
     </div>
   );
 }
+
+    

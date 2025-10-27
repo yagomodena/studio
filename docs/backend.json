@@ -206,7 +206,8 @@
         },
         "companyId": {
           "type": "string",
-          "description": "Reference to the Company that owns this financial record. (Relationship: Company 1:N FinancialRecord)"
+          "description": "Reference to the Company that owns this financial record. (Relationship
+: Company 1:N FinancialRecord)"
         }
       },
       "required": [
@@ -250,6 +251,27 @@
         }
       },
       "required": ["id", "name", "email", "companyId"]
+    },
+    "Category": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Category",
+      "type": "object",
+      "description": "Represents a product category.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the category."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the category."
+        },
+        "companyId": {
+          "type": "string",
+          "description": "Reference to the Company this category belongs to."
+        }
+      },
+      "required": ["id", "name", "companyId"]
     }
   },
   "auth": {
@@ -391,9 +413,30 @@
             }
           ]
         }
+      },
+      {
+        "path": "/companies/{companyId}/categories/{categoryId}",
+        "definition": {
+          "entityName": "Category",
+          "schema": {
+            "$ref": "#/backend/entities/Category"
+          },
+          "description": "Stores product categories for a specific company.",
+          "params": [
+            {
+              "name": "companyId",
+              "description": "Unique identifier for the company."
+            },
+            {
+              "name": "categoryId",
+              "description": "Unique identifier for the category."
+            }
+          ]
+        }
       }
     ],
     "reasoning": "The Firestore structure is designed to ensure data isolation between companies and efficient querying for company-specific data. It leverages path-based ownership for User data and segregation of data based on companyId. This approach avoids complex queries and ensures security rules are straightforward and performant. Denormalization is applied where needed to maintain authorization independence. Specifically, the `companyId` is included in every document belonging to a company, allowing for simple and robust rules based on `request.auth.uid` and the user's `companyId`. This ensures that list operations can be securely performed by filtering based on the `companyId`. The structure uses hierarchical paths for User-Owned Data (Company 1:N Entity). Each company has its own set of users, products, sales, orders and financial records."
   }
 }
+
     

@@ -44,7 +44,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { PlusCircle, MoreHorizontal, Pencil, Trash2, Loader2 } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
 import { collection, doc, serverTimestamp } from 'firebase/firestore';
 import { addDocumentNonBlocking, setDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase/non-blocking-updates';
@@ -115,7 +115,6 @@ export default function CustomersPage() {
         if (editingCustomer) {
             const customerDocRef = doc(customersRef, editingCustomer.id);
             setDocumentNonBlocking(customerDocRef, {
-              ...editingCustomer,
               ...customerData,
               updatedAt: serverTimestamp(),
             }, { merge: true });

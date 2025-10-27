@@ -23,7 +23,6 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-  DialogClose,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -91,6 +90,12 @@ export default function CategoriesPage() {
         }
         setIsDialogOpen(true);
     };
+    
+    const handleCloseDialog = () => {
+        setIsDialogOpen(false);
+        setEditingCategory(null);
+        setFormState({ name: '' });
+    }
 
     const handleDelete = (id: string) => {
         if (!categoriesRef) return;
@@ -100,7 +105,7 @@ export default function CategoriesPage() {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!categoriesRef || !userProfile?.companyId) return;
+        if (!categoriesRef || !userProfile?.companyId || !formState.name) return;
 
         const categoryData = {
           name: formState.name,
@@ -120,7 +125,7 @@ export default function CategoriesPage() {
               createdAt: serverTimestamp(),
             });
         }
-        setIsDialogOpen(false);
+        handleCloseDialog();
     };
     
     const handleFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -248,11 +253,9 @@ export default function CategoriesPage() {
               </div>
             </div>
             <DialogFooter>
-              <DialogClose asChild>
-                <Button type="button" variant="secondary">
+                <Button type="button" variant="secondary" onClick={handleCloseDialog}>
                   Cancelar
                 </Button>
-              </DialogClose>
               <Button type="submit">Salvar</Button>
             </DialogFooter>
           </form>
@@ -261,5 +264,3 @@ export default function CategoriesPage() {
     </div>
   );
 }
-
-    

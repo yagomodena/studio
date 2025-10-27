@@ -40,7 +40,7 @@ const PricingSection = () => {
                   className={cn("w-full", plan.isFeatured ? "bg-accent hover:bg-accent/90 text-accent-foreground" : "")}
                   variant={plan.isFeatured ? "default" : "outline"}
                 >
-                  <Link href="/signup">{plan.cta}</Link>
+                  <Link href={`/signup?plan=${encodeURIComponent(plan.name)}`}>{plan.cta}</Link>
                 </Button>
               </CardFooter>
             </Card>

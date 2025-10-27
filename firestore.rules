@@ -1,178 +1,145 @@
 /**
- * @fileoverview Firestore Security Rules for EasyBusiness application.
- *
- * Core Philosophy:
- * This ruleset enforces a strict company-based data isolation model. Each company's data 
- * (products, sales, orders, financial records) is stored under its own unique path.
- * User data is also stored under its own path, with `companyId` included in the document for authorization.
+ * @file Firestore Security Rules for EasyBusiness
+ * @description This ruleset enforces a strict company-based data isolation model, allowing users to only access data belonging to their company.
  *
  * Data Structure:
- * - /companies/{companyId}: Root collection for company profiles.
- * - /users/{userId}: Root collection for user profiles.
- * - /companies/{companyId}/products/{productId}: Products belonging to a company.
- * - /companies/{companyId}/sales/{saleId}: Sales records for a company.
- * - /companies/{companyId}/orders/{orderId}: Orders placed with a company.
- * - /companies/{companyId}/financialRecords/{financialRecordId}: Financial records for a company.
+ * - /companies/{companyId}: Stores company profile information.
+ * - /users/{userId}: Stores user profile information.
+ * - /companies/{companyId}/products/{productId}: Stores product information for each company.
+ * - /companies/{companyId}/sales/{saleId}: Stores sales data for each company.
+ * - /companies/{companyId}/orders/{orderId}: Stores order data for each company.
+ * - /companies/{companyId}/financialRecords/{financialRecordId}: Stores financial records for each company.
  *
  * Key Security Decisions:
- * - User listing is generally disallowed for privacy.
- * - All write operations within a company's data tree require the user to be a member of that company.
- * - Read operations (get, list) follow the same company membership requirement.
- * - Data consistency is enforced by ensuring that the `companyId` within a document matches the `companyId` in the path.
- *
- * Denormalization for Authorization:
- * The `companyId` is denormalized (copied) into each document under the `/companies/{companyId}` path. 
- * This allows for efficient authorization checks without needing to perform additional `get()` operations.
+ * - All data is segregated by `companyId`. Users can only access data associated with their `companyId`.
+ * - User listing is generally disallowed for privacy reasons, except for the currently logged-in user.
+ * - Denormalization: The `companyId` is denormalized onto all company-owned subcollections to avoid costly `get()` operations in the security rules.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Allows access to company documents based on user authentication.
+     * @description Allows read access to company information but restricts write access.
      * @path /companies/{companyId}
-     * @allow (get) User with any auth can fetch a company document.
-     * @allow (create) A user can create a company document. The 'id' field in the document must match the 'companyId' in the path.
-     * @allow (update) A user can update a company document if it exists.
-     * @allow (delete) A user can delete a company document if it exists.
-     * @deny (create) A user attempts to create a company document with a mismatched 'id' field.
-     * @principle Enforces company-level data isolation and validates document ownership.
+     * @allow get, list: if true (Company information is considered public)
+     * @allow create: if false (Companies are created via admin tools)
+     * @deny update: if true (Company updates are restricted)
+     * @deny delete: if true (Company deletion is restricted)
+     * @principle Allows public read access to company profiles, restricts write access.
      */
     match /companies/{companyId} {
-      // Anyone can read company profiles
-      allow get: if true;
-      // Only allow creating a company if the document id matches the companyId and they are signed in
-      allow create: if isSignedIn() && request.resource.data.id == companyId;
-      // Only allow updates and deletes if the document exists.
-      allow update, delete: if isSignedIn() && resource != null;
-      allow list: if false; // Listing companies is not allowed
+      allow get, list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Allows access to user documents based on user ownership.
+     * @description Restricts access to user profiles to the owner.
      * @path /users/{userId}
-     * @allow (get) User with matching UID can fetch their own user document.
-     * @allow (create) User with matching UID can create their own user document. The 'id' field in the document must match the 'userId' in the path.
-     * @allow (update) User with matching UID can update their own user document if it exists.
-     * @allow (delete) User with matching UID can delete their own user document if it exists.
-     * @deny (create) User attempts to create a user document with a mismatched 'id' field.
-     * @principle Enforces user-level data isolation and validates document ownership.
+     * @allow get: if isSignedIn() && isOwner(userId);
+     * @allow list: if isSignedIn() && isOwner(userId);
+     * @allow create: if isSignedIn() && isOwner(userId);
+     * @allow update: if isSignedIn() && isOwner(userId);
+     * @allow delete: if isSignedIn() && isExistingOwner(userId);
+     * @principle Enforces strict user ownership.
      */
     match /users/{userId} {
-      allow get: if isOwner(userId);
-      allow create: if isOwner(userId) && request.resource.data.id == userId;
-      allow update, delete: if isExistingOwner(userId) && request.resource.data.id == userId;
-      allow list: if false; // Listing users is not allowed
+      allow get: if isSignedIn() && isOwner(userId);
+      allow list: if isSignedIn() && request.auth.uid == userId;
+      allow create: if isSignedIn() && isOwner(userId);
+      allow update: if isSignedIn() && isOwner(userId);
+      allow delete: if isSignedIn() && isOwner(userId);
     }
 
     /**
-     * @description Allows access to product documents within a company based on company membership.
+     * @description Allows company members to manage products within their company.
      * @path /companies/{companyId}/products/{productId}
-     * @allow (get) User belonging to the company can fetch a product document.
-     * @allow (create) User belonging to the company can create a product document. The 'companyId' field in the document must match the 'companyId' in the path.
-     * @allow (update) User belonging to the company can update a product document if it exists and the 'companyId' matches.
-     * @allow (delete) User belonging to the company can delete a product document if it exists and the 'companyId' matches.
-     * @deny (create) User attempts to create a product document with a mismatched 'companyId' field.
-     * @principle Enforces company-level data isolation and validates document ownership.
+     * @allow get, list: if isSignedIn() && isCompanyMember(companyId);
+     * @allow create: if isSignedIn() && isCompanyMember(companyId);
+     * @allow update: if isSignedIn() && isCompanyMember(companyId);
+     * @allow delete: if isSignedIn() && isCompanyMember(companyId);
+     * @principle Enforces company-based ownership for products.
      */
     match /companies/{companyId}/products/{productId} {
-      allow get, list: if isCompanyMember(companyId);
-      allow create: if isCompanyMember(companyId) && request.resource.data.companyId == companyId;
-      allow update, delete: if isExistingCompanyMember(companyId) && resource.data.companyId == companyId;
+      allow get: if isSignedIn() && isCompanyMember(companyId);
+      allow list: if isSignedIn() && isCompanyMember(companyId);
+      allow create: if isSignedIn() && isCompanyMember(companyId);
+      allow update: if isSignedIn() && isCompanyMember(companyId);
+      allow delete: if isSignedIn() && isCompanyMember(companyId);
     }
 
     /**
-     * @description Allows access to sales documents within a company based on company membership.
+     * @description Allows company members to manage sales data within their company.
      * @path /companies/{companyId}/sales/{saleId}
-     * @allow (get) User belonging to the company can fetch a sale document.
-     * @allow (create) User belonging to the company can create a sale document. The 'companyId' field in the document must match the 'companyId' in the path.
-     * @allow (update) User belonging to the company can update a sale document if it exists and the 'companyId' matches.
-     * @allow (delete) User belonging to the company can delete a sale document if it exists and the 'companyId' matches.
-     * @deny (create) User attempts to create a sale document with a mismatched 'companyId' field.
-     * @principle Enforces company-level data isolation and validates document ownership.
+     * @allow get, list: if isSignedIn() && isCompanyMember(companyId);
+     * @allow create: if isSignedIn() && isCompanyMember(companyId);
+     * @allow update: if isSignedIn() && isCompanyMember(companyId);
+     * @allow delete: if isSignedIn() && isCompanyMember(companyId);
+     * @principle Enforces company-based ownership for sales data.
      */
     match /companies/{companyId}/sales/{saleId} {
-      allow get, list: if isCompanyMember(companyId);
-      allow create: if isCompanyMember(companyId) && request.resource.data.companyId == companyId;
-      allow update, delete: if isExistingCompanyMember(companyId) && resource.data.companyId == companyId;
+      allow get: if isSignedIn() && isCompanyMember(companyId);
+      allow list: if isSignedIn() && isCompanyMember(companyId);
+      allow create: if isSignedIn() && isCompanyMember(companyId);
+      allow update: if isSignedIn() && isCompanyMember(companyId);
+      allow delete: if isSignedIn() && isCompanyMember(companyId);
     }
 
     /**
-     * @description Allows access to order documents within a company based on company membership.
+     * @description Allows company members to manage orders within their company.
      * @path /companies/{companyId}/orders/{orderId}
-     * @allow (get) User belonging to the company can fetch an order document.
-     * @allow (create) User belonging to the company can create an order document. The 'companyId' field in the document must match the 'companyId' in the path.
-     * @allow (update) User belonging to the company can update an order document if it exists and the 'companyId' matches.
-     * @allow (delete) User belonging to the company can delete an order document if it exists and the 'companyId' matches.
-     * @deny (create) User attempts to create an order document with a mismatched 'companyId' field.
-     * @principle Enforces company-level data isolation and validates document ownership.
+     * @allow get, list: if isSignedIn() && isCompanyMember(companyId);
+     * @allow create: if isSignedIn() && isCompanyMember(companyId);
+     * @allow update: if isSignedIn() && isCompanyMember(companyId);
+     * @allow delete: if isSignedIn() && isCompanyMember(companyId);
+     * @principle Enforces company-based ownership for orders.
      */
     match /companies/{companyId}/orders/{orderId} {
-      allow get, list: if isCompanyMember(companyId);
-      allow create: if isCompanyMember(companyId) && request.resource.data.companyId == companyId;
-      allow update, delete: if isExistingCompanyMember(companyId) && resource.data.companyId == companyId;
+      allow get: if isSignedIn() && isCompanyMember(companyId);
+      allow list: if isSignedIn() && isCompanyMember(companyId);
+      allow create: if isSignedIn() && isCompanyMember(companyId);
+      allow update: if isSignedIn() && isCompanyMember(companyId);
+      allow delete: if isSignedIn() && isCompanyMember(companyId);
     }
 
     /**
-     * @description Allows access to financial record documents within a company based on company membership.
+     * @description Allows company members to manage financial records within their company.
      * @path /companies/{companyId}/financialRecords/{financialRecordId}
-     * @allow (get) User belonging to the company can fetch a financial record document.
-     * @allow (create) User belonging to the company can create a financial record document. The 'companyId' field in the document must match the 'companyId' in the path.
-     * @allow (update) User belonging to the company can update a financial record document if it exists and the 'companyId' matches.
-     * @allow (delete) User belonging to the company can delete a financial record document if it exists and the 'companyId' matches.
-     * @deny (create) User attempts to create a financial record document with a mismatched 'companyId' field.
-     * @principle Enforces company-level data isolation and validates document ownership.
+     * @allow get, list: if isSignedIn() && isCompanyMember(companyId);
+     * @allow create: if isSignedIn() && isCompanyMember(companyId);
+     * @allow update: if isSignedIn() && isCompanyMember(companyId);
+     * @allow delete: if isSignedIn() && isCompanyMember(companyId);
+     * @principle Enforces company-based ownership for financial records.
      */
     match /companies/{companyId}/financialRecords/{financialRecordId} {
-      allow get, list: if isCompanyMember(companyId);
-      allow create: if isCompanyMember(companyId) && request.resource.data.companyId == companyId;
-      allow update, delete: if isExistingCompanyMember(companyId) && resource.data.companyId == companyId;
+      allow get: if isSignedIn() && isCompanyMember(companyId);
+      allow list: if isSignedIn() && isCompanyMember(companyId);
+      allow create: if isSignedIn() && isCompanyMember(companyId);
+      allow update: if isSignedIn() && isCompanyMember(companyId);
+      allow delete: if isSignedIn() && isCompanyMember(companyId);
     }
+  }
 
-    // --- Helper Functions ---
+  // Helper functions
+  function isSignedIn() {
+    return request.auth != null;
+  }
 
-    /**
-     * @description Checks if the user is signed in.
-     * @return {boolean} True if the user is signed in, false otherwise.
-     */
-    function isSignedIn() {
-      return request.auth != null;
-    }
+  function isOwner(userId) {
+    return request.auth.uid == userId;
+  }
 
-    /**
-     * @description Checks if the user is the owner of the document based on the provided user ID.
-     * @param {string} userId The user ID to compare against the authenticated user's UID.
-     * @return {boolean} True if the user is the owner, false otherwise.
-     */
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
+  function isExistingOwner(userId) {
+    return isSignedIn() && isOwner(userId);
+  }
 
-    /**
-     * @description Checks if the user is the owner of the document and the document exists.
-     * @param {string} userId The user ID to compare against the authenticated user's UID.
-     * @return {boolean} True if the user is the owner and the document exists, false otherwise.
-     */
-    function isExistingOwner(userId) {
-      return isOwner(userId) && resource != null;
-    }
+  function isCompanyMember(companyId) {
+    return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyId == companyId;
+  }
 
-    /**
-     * @description Checks if the user is a member of the specified company.
-     * @param {string} companyId The company ID to check against the user's company ID.
-     * @return {boolean} True if the user is a member of the company, false otherwise.
-     */
-    function isCompanyMember(companyId) {
-      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyId == companyId;
-    }
-
-    /**
-     * @description Checks if the user is a member of the specified company and the document exists.
-     * @param {string} companyId The company ID to check against the user's company ID.
-     * @return {boolean} True if the user is a member of the company and the document exists, false otherwise.
-     */
-    function isExistingCompanyMember(companyId) {
-      return isCompanyMember(companyId) && resource != null;
-    }
+  function isExistingCompanyMember(companyId) {
+      return isSignedIn() && isCompanyMember(companyId);
   }
 }

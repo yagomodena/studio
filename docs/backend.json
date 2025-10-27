@@ -14,15 +14,15 @@
           "type": "string",
           "description": "Name of the company."
         },
-        "subscriptionPlan": {
+        "plan": {
           "type": "string",
-          "description": "The subscription plan of the company (e.g., Standard, Plus)."
+          "description": "Subscription plan of the company (e.g., Standard, Plus)."
         }
       },
       "required": [
         "id",
         "name",
-        "subscriptionPlan"
+        "plan"
       ]
     },
     "User": {
@@ -46,11 +46,15 @@
         },
         "companyId": {
           "type": "string",
-          "description": "Reference to Company. (Relationship: Company 1:N User). The company the user belongs to."
+          "description": "Reference to the Company this user belongs to. (Relationship: Company 1:N User)"
         },
-        "role": {
+        "permission": {
           "type": "string",
-          "description": "Role of the user within the company (e.g., admin, standard)."
+          "description": "Role/permission of the user within the company (e.g., admin, standard)."
+        },
+        "phone": {
+          "type": "string",
+          "description": "Phone number of the user."
         }
       },
       "required": [
@@ -58,14 +62,15 @@
         "name",
         "email",
         "companyId",
-        "role"
+        "permission",
+        "phone"
       ]
     },
     "Product": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Product",
       "type": "object",
-      "description": "Represents a product in the stock control system.",
+      "description": "Represents a product managed within the EasyBusiness system.",
       "properties": {
         "id": {
           "type": "string",
@@ -85,7 +90,7 @@
         },
         "companyId": {
           "type": "string",
-          "description": "Reference to Company. (Relationship: Company 1:N Product). The company that owns the product."
+          "description": "Reference to the Company that owns this product. (Relationship: Company 1:N Product)"
         }
       },
       "required": [
@@ -100,7 +105,7 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Sale",
       "type": "object",
-      "description": "Represents a sale record.",
+      "description": "Represents a sale recorded within the EasyBusiness system.",
       "properties": {
         "id": {
           "type": "string",
@@ -108,7 +113,7 @@
         },
         "productIds": {
           "type": "array",
-          "description": "References to Products. (Relationship: Sale N:N Product). List of product IDs included in the sale.",
+          "description": "References to Products included in this sale. (Relationship: Sale 1:N Product)",
           "items": {
             "type": "string"
           }
@@ -119,7 +124,7 @@
         },
         "customer": {
           "type": "string",
-          "description": "Customer associated with the sale."
+          "description": "Customer associated with the sale (can be a name or identifier)."
         },
         "status": {
           "type": "string",
@@ -127,7 +132,7 @@
         },
         "companyId": {
           "type": "string",
-          "description": "Reference to Company. (Relationship: Company 1:N Sale). The company that made the sale."
+          "description": "Reference to the Company that recorded this sale. (Relationship: Company 1:N Sale)"
         }
       },
       "required": [
@@ -143,7 +148,7 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Order",
       "type": "object",
-      "description": "Represents a customer order.",
+      "description": "Represents a customer order within the EasyBusiness system.",
       "properties": {
         "id": {
           "type": "string",
@@ -151,7 +156,7 @@
         },
         "productIds": {
           "type": "array",
-          "description": "References to Products. (Relationship: Order N:N Product). List of product IDs included in the order.",
+          "description": "References to Products included in this order. (Relationship: Order 1:N Product)",
           "items": {
             "type": "string"
           }
@@ -166,7 +171,7 @@
         },
         "companyId": {
           "type": "string",
-          "description": "Reference to Company. (Relationship: Company 1:N Order). The company that received the order."
+          "description": "Reference to the Company that owns this order. (Relationship: Company 1:N Order)"
         }
       },
       "required": [
@@ -181,7 +186,7 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "FinancialRecord",
       "type": "object",
-      "description": "Represents a financial record (income or expense).",
+      "description": "Represents a financial record (income or expense) within the EasyBusiness system.",
       "properties": {
         "id": {
           "type": "string",
@@ -201,7 +206,7 @@
         },
         "companyId": {
           "type": "string",
-          "description": "Reference to Company. (Relationship: Company 1:N FinancialRecord). The company associated with the financial record."
+          "description": "Reference to the Company that owns this financial record. (Relationship: Company 1:N FinancialRecord)"
         }
       },
       "required": [
@@ -222,13 +227,13 @@
   "firestore": {
     "structure": [
       {
-        "path": "companies/{companyId}",
+        "path": "/companies/{companyId}",
         "definition": {
           "entityName": "Company",
           "schema": {
             "$ref": "#/backend/entities/Company"
           },
-          "description": "Stores company information. The `companyId` is used to isolate data for each company.",
+          "description": "Stores company information. Root level collection.",
           "params": [
             {
               "name": "companyId",
@@ -238,13 +243,13 @@
         }
       },
       {
-        "path": "users/{userId}",
+        "path": "/users/{userId}",
         "definition": {
           "entityName": "User",
           "schema": {
             "$ref": "#/backend/entities/User"
           },
-          "description": "Stores user information. Includes `companyId` to associate the user with a company and `role` for access control.",
+          "description": "Stores user information. Includes companyId for authorization.",
           "params": [
             {
               "name": "userId",
@@ -254,13 +259,13 @@
         }
       },
       {
-        "path": "companies/{companyId}/products/{productId}",
+        "path": "/companies/{companyId}/products/{productId}",
         "definition": {
           "entityName": "Product",
           "schema": {
             "$ref": "#/backend/entities/Product"
           },
-          "description": "Stores product information for a specific company. Includes denormalized `companyId` for authorization independence.",
+          "description": "Stores product information for a specific company. Includes denormalized 'companyId' for authorization independence.",
           "params": [
             {
               "name": "companyId",
@@ -274,13 +279,13 @@
         }
       },
       {
-        "path": "companies/{companyId}/sales/{saleId}",
+        "path": "/companies/{companyId}/sales/{saleId}",
         "definition": {
           "entityName": "Sale",
           "schema": {
             "$ref": "#/backend/entities/Sale"
           },
-          "description": "Stores sales data for a specific company. Includes denormalized `companyId` for authorization independence.",
+          "description": "Stores sales data for a specific company. Includes denormalized 'companyId' for authorization independence.",
           "params": [
             {
               "name": "companyId",
@@ -294,13 +299,13 @@
         }
       },
       {
-        "path": "companies/{companyId}/orders/{orderId}",
+        "path": "/companies/{companyId}/orders/{orderId}",
         "definition": {
           "entityName": "Order",
           "schema": {
             "$ref": "#/backend/entities/Order"
           },
-          "description": "Stores order data for a specific company. Includes denormalized `companyId` for authorization independence.",
+          "description": "Stores order information for a specific company. Includes denormalized 'companyId' for authorization independence.",
           "params": [
             {
               "name": "companyId",
@@ -314,13 +319,13 @@
         }
       },
       {
-        "path": "companies/{companyId}/financialRecords/{financialRecordId}",
+        "path": "/companies/{companyId}/financialRecords/{financialRecordId}",
         "definition": {
           "entityName": "FinancialRecord",
           "schema": {
             "$ref": "#/backend/entities/FinancialRecord"
           },
-          "description": "Stores financial records (income/expense) for a specific company. Includes denormalized `companyId` for authorization independence.",
+          "description": "Stores financial records for a specific company. Includes denormalized 'companyId' for authorization independence.",
           "params": [
             {
               "name": "companyId",
@@ -334,6 +339,6 @@
         }
       }
     ],
-    "reasoning": "The Firestore structure is designed to support a multi-tenant SaaS application ('EasyBusiness') with a focus on data isolation and role-based access control. Each company's data is stored under its own document ID, ensuring data isolation.  User roles are explicitly stored in the `User` document (`role` field), and access rules are based on matching the `companyId` field and the user's `role`. This approach achieves Authorization Independence by denormalizing the `companyId` onto every document (Products, Sales, Orders, FinancialRecords, Users). This eliminates the need for `get()` calls to parent documents, enabling atomic operations. The design leverages Structural Segregation by placing data related to different companies in separate subcollections under the `companies` collection and user-owned data in `users` subcollection. This ensures that all documents within a collection share the same security requirements.  QAPs (Rules are not Filters) are achieved by scoping queries within the company's documents or user's documents, preventing unauthorized data listing. For example, listing all products is done within the scope of a specific `companyId`, ensuring that only products belonging to that company are retrieved."
+    "reasoning": "The Firestore structure is designed to ensure data isolation between companies and efficient querying for company-specific data. It leverages path-based ownership for User data and segregation of data based on companyId. This approach avoids complex queries and ensures security rules are straightforward and performant. Denormalization is applied where needed to maintain authorization independence. Specifically, the `companyId` is included in every document belonging to a company, allowing for simple and robust rules based on `request.auth.uid` and the user's `companyId`. This ensures that list operations can be securely performed by filtering based on the `companyId`. The structure uses hierarchical paths for User-Owned Data (Company 1:N Entity). Each company has its own set of users, products, sales, orders and financial records."
   }
 }

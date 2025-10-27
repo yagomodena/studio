@@ -1,15 +1,15 @@
-import {onCall} from "firebase-functions/v2/h";
+import { onCall } from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
-import {initializeApp} from "firebase-admin/app";
-import {getFirestore} from "firebase-admin/firestore";
+import { initializeApp } from "firebase-admin/app";
+import { getFirestore, Timestamp } from "firebase-admin/firestore";
 
 initializeApp();
 
 export const addUserToFirestore = onCall(async (request) => {
-  const {uid, email, name, companyName, phone, plan} = request.data;
+  const { uid, email, name, companyName, phone, plan } = request.data;
 
   if (!uid || !email || !name || !companyName || !phone || !plan) {
-    logger.error("Missing data in request", {data: request.data});
+    logger.error("Missing data in request", { data: request.data });
     throw new Error("Missing data for user creation.");
   }
 
@@ -20,22 +20,24 @@ export const addUserToFirestore = onCall(async (request) => {
 
     const batch = db.batch();
 
+    const now = Timestamp.now();
+
     // Create company
     batch.set(companyRef, {
       name: companyName,
-      plan: plan,
+      plan,
       ownerId: uid,
-      createdAt: new Date(),
+      createdAt: now,
     });
 
     // Create user profile
     batch.set(userRef, {
-      name: name,
-      email: email,
-      phone: phone,
+      name,
+      email,
+      phone,
       companyId: companyRef.id,
-      role: "Admin", // Default role
-      createdAt: new Date(),
+      role: "Admin",
+      createdAt: now,
     });
 
     await batch.commit();
@@ -46,8 +48,11 @@ export const addUserToFirestore = onCall(async (request) => {
       companyId: companyRef.id,
       userId: uid,
     };
-  } catch (error) {
-    logger.error("Error creating user and company:", error);
-    throw new Error("Failed to set up user and company in Firestore.");
+  } catch (error: any) {
+    logger.error("Error creating user and company:", {
+      message: error.message,
+      stack: error.stack,
+    });
+    throw new Error(`Failed to set up user and company in Firestore: ${error.message}`);
   }
 });

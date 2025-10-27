@@ -1,164 +1,166 @@
 /**
- * @fileoverview Firestore Security Rules for EasyBusiness application.
- *
- * Core Philosophy:
- * This ruleset enforces a multi-tenant security model where data is primarily isolated at the company level.
- * Users can only access data belonging to the company they are associated with.
+ * @file Firestore Security Rules
+ * @description This ruleset enforces a strict company-based data isolation model.
  *
  * Data Structure:
- * - /companies/{companyId}: Stores company-wide data.
- * - /users/{userId}: Stores user-specific data, including the companyId to which the user belongs.
- * - /companies/{companyId}/products/{productId}: Stores product data for a specific company.
- * - /companies/{companyId}/sales/{saleId}: Stores sales data for a specific company.
- * - /companies/{companyId}/orders/{orderId}: Stores order data for a specific company.
- * - /companies/{companyId}/financialRecords/{financialRecordId}: Stores financial records for a specific company.
- * - /companies/{companyId}/customers/{customerId}: Stores customer data for a specific company.
+ * - /companies/{companyId}: Stores company profiles.
+ * - /users/{userId}: Stores user profiles, linked to a company via companyId.
+ * - /companies/{companyId}/products/{productId}: Stores products, scoped to a company.
+ * - /companies/{companyId}/sales/{saleId}: Stores sales, scoped to a company.
+ * - /companies/{companyId}/orders/{orderId}: Stores orders, scoped to a company.
+ * - /companies/{companyId}/financialRecords/{financialRecordId}: Stores financial records, scoped to a company.
+ * - /companies/{companyId}/customers/{customerId}: Stores customers, scoped to a company.
+ * - /companies/{companyId}/categories/{categoryId}: Stores product categories, scoped to a company.
  *
  * Key Security Decisions:
- * - Strict company-level isolation: Users can only access data within their assigned company.
- * - User documents (`/users/{userId}`) are owned by the user themselves.
- * - The `companyId` field is denormalized into all company-owned subcollections to simplify authorization rules.
+ * - Data is isolated at the company level. Users can only access data associated with their company.
+ * - `companyId` is denormalized onto child documents (products, sales, etc.) to enable efficient and secure rules without complex queries.
+ * - List operations are secured by filtering based on the `companyId`.
+ * - User documents are secured with owner-only access.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Allows read and write access to company documents.
+     * @description Allows read and create access to company documents.
      * @path /companies/{companyId}
-     * @allow get, list: if true
-     * @allow create: if request.auth != null; // Requires authentication
-     * @allow update: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-     * @allow delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-     * @principle Public read, owner-only writes, but writes are not yet secured.
+     * @allow (get, list): if true (Public read access)
+     * @allow (create): if request.resource.data.id == companyId
+     * @deny (update, delete): Always. Companies can't be updated or deleted.
+     * @principle Allows public read access to company information, but restricts write access.
      */
     match /companies/{companyId} {
       allow get, list: if true;
-      allow create: if isSignedIn();
-      allow update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow create: if request.auth != null && request.resource.data.id == companyId;
+      allow update, delete: if false;
     }
 
     /**
-     * @description Allows users to read and write their own user document.
+     * @description Allows owner-only access to user documents.
      * @path /users/{userId}
-     * @allow get: if isOwner(userId)
-     * @allow list: if false
-     * @allow create: if isOwner(userId)
-     * @allow update: if isExistingOwner(userId)
-     * @allow delete: if isExistingOwner(userId)
-     * @deny get: if !isSignedIn()
-     * @deny create: if !isSignedIn()
-     * @deny update: if !isSignedIn()
-     * @deny delete: if !isSignedIn()
-     * @principle Enforces document ownership for all operations.
+     * @allow (get, list): if isOwner(userId)
+     * @allow (create): if isOwner(userId)
+     * @allow (update, delete): if isExistingOwner(userId)
+     * @deny: if request.auth == null
+     * @principle Enforces strict user-ownership for all data access and modifications.
      */
     match /users/{userId} {
-      allow get: if isSignedIn() && isOwner(userId);
-      allow list: if false;
+      allow get, list: if isSignedIn() && isOwner(userId);
       allow create: if isSignedIn() && isOwner(userId);
-      allow update: if isSignedIn() && isExistingOwner(userId);
-      allow delete: if isSignedIn() && isExistingOwner(userId);
+      allow update, delete: if isSignedIn() && isExistingOwner(userId);
     }
 
     /**
-     * @description Allows read and write access to products for users within the specified company.
+     * @description Allows company-level access to product documents.
      * @path /companies/{companyId}/products/{productId}
-     * @allow get, list: if isMemberOfCompany(companyId);
-     * @allow create: if isMemberOfCompany(companyId) && request.resource.data.companyId == companyId;
-     * @allow update: if isMemberOfCompany(companyId) && isExistingCompanyDocument(companyId, resource.data.companyId);
-     * @allow delete: if isMemberOfCompany(companyId) && isExistingCompanyDocument(companyId, resource.data.companyId);
-     * @principle Enforces company membership for all operations.
+     * @allow (get, list): if isCompanyMember(companyId)
+     * @allow (create): if isCompanyMember(companyId) && request.resource.data.companyId == companyId
+     * @allow (update, delete): if isCompanyMember(companyId) && isExistingCompanyDocument(companyId, resource.data.companyId)
+     * @deny: if request.auth == null
+     * @principle Enforces that only members of a company can access product data.
      */
     match /companies/{companyId}/products/{productId} {
-      allow get, list: if isSignedIn() && isMemberOfCompany(companyId);
-      allow create: if isSignedIn() && isMemberOfCompany(companyId) && request.resource.data.companyId == companyId;
-      allow update: if isSignedIn() && isMemberOfCompany(companyId) && isExistingCompanyDocument(companyId, request.resource.data.companyId);
-      allow delete: if isSignedIn() && isMemberOfCompany(companyId) && isExistingCompanyDocument(companyId, resource.data.companyId);
+      allow get, list: if isSignedIn() && isCompanyMember(companyId);
+      allow create: if isSignedIn() && isCompanyMember(companyId) && request.resource.data.companyId == companyId;
+      allow update, delete: if isSignedIn() && isCompanyMember(companyId) && isExistingCompanyDocument(companyId, resource.data.companyId);
     }
 
     /**
-     * @description Allows read and write access to sales data for users within the specified company.
+     * @description Allows company-level access to sales documents.
      * @path /companies/{companyId}/sales/{saleId}
-     * @allow get, list: if isMemberOfCompany(companyId);
-     * @allow create: if isMemberOfCompany(companyId) && request.resource.data.companyId == companyId;
-     * @allow update: if isMemberOfCompany(companyId) && isExistingCompanyDocument(companyId, resource.data.companyId);
-     * @allow delete: if isMemberOfCompany(companyId) && isExistingCompanyDocument(companyId, resource.data.companyId);
-     * @principle Enforces company membership for all operations.
+     * @allow (get, list): if isCompanyMember(companyId)
+     * @allow (create): if isCompanyMember(companyId) && request.resource.data.companyId == companyId
+     * @allow (update, delete): if isCompanyMember(companyId) && isExistingCompanyDocument(companyId, resource.data.companyId)
+     * @deny: if request.auth == null
+     * @principle Enforces that only members of a company can access sales data.
      */
     match /companies/{companyId}/sales/{saleId} {
-      allow get, list: if isSignedIn() && isMemberOfCompany(companyId);
-      allow create: if isSignedIn() && isMemberOfCompany(companyId) && request.resource.data.companyId == companyId;
-      allow update: if isSignedIn() && isMemberOfCompany(companyId) && isExistingCompanyDocument(companyId, request.resource.data.companyId);
-      allow delete: if isSignedIn() && isMemberOfCompany(companyId) && isExistingCompanyDocument(companyId, resource.data.companyId);
+      allow get, list: if isSignedIn() && isCompanyMember(companyId);
+      allow create: if isSignedIn() && isCompanyMember(companyId) && request.resource.data.companyId == companyId;
+      allow update, delete: if isSignedIn() && isCompanyMember(companyId) && isExistingCompanyDocument(companyId, resource.data.companyId);
     }
 
     /**
-     * @description Allows read and write access to orders for users within the specified company.
+     * @description Allows company-level access to order documents.
      * @path /companies/{companyId}/orders/{orderId}
-     * @allow get, list: if isMemberOfCompany(companyId);
-     * @allow create: if isMemberOfCompany(companyId) && request.resource.data.companyId == companyId;
-     * @allow update: if isMemberOfCompany(companyId) && isExistingCompanyDocument(companyId, resource.data.companyId);
-     * @allow delete: if isMemberOfCompany(companyId) && isExistingCompanyDocument(companyId, resource.data.companyId);
-     * @principle Enforces company membership for all operations.
+     * @allow (get, list): if isCompanyMember(companyId)
+     * @allow (create): if isCompanyMember(companyId) && request.resource.data.companyId == companyId
+     * @allow (update, delete): if isCompanyMember(companyId) && isExistingCompanyDocument(companyId, resource.data.companyId)
+     * @deny: if request.auth == null
+     * @principle Enforces that only members of a company can access order data.
      */
     match /companies/{companyId}/orders/{orderId} {
-      allow get, list: if isSignedIn() && isMemberOfCompany(companyId);
-      allow create: if isSignedIn() && isMemberOfCompany(companyId) && request.resource.data.companyId == companyId;
-      allow update: if isSignedIn() && isMemberOfCompany(companyId) && isExistingCompanyDocument(companyId, request.resource.data.companyId);
-      allow delete: if isSignedIn() && isMemberOfCompany(companyId) && isExistingCompanyDocument(companyId, resource.data.companyId);
+      allow get, list: if isSignedIn() && isCompanyMember(companyId);
+      allow create: if isSignedIn() && isCompanyMember(companyId) && request.resource.data.companyId == companyId;
+      allow update, delete: if isSignedIn() && isCompanyMember(companyId) && isExistingCompanyDocument(companyId, resource.data.companyId);
     }
 
     /**
-     * @description Allows read and write access to financial records for users within the specified company.
+     * @description Allows company-level access to financial record documents.
      * @path /companies/{companyId}/financialRecords/{financialRecordId}
-     * @allow get, list: if isMemberOfCompany(companyId);
-     * @allow create: if isMemberOfCompany(companyId) && request.resource.data.companyId == companyId;
-     * @allow update: if isMemberOfCompany(companyId) && isExistingCompanyDocument(companyId, resource.data.companyId);
-     * @allow delete: if isMemberOfCompany(companyId) && isExistingCompanyDocument(companyId, resource.data.companyId);
-     * @principle Enforces company membership for all operations.
+     * @allow (get, list): if isCompanyMember(companyId)
+     * @allow (create): if isCompanyMember(companyId) && request.resource.data.companyId == companyId
+     * @allow (update, delete): if isCompanyMember(companyId) && isExistingCompanyDocument(companyId, resource.data.companyId)
+     * @deny: if request.auth == null
+     * @principle Enforces that only members of a company can access financial record data.
      */
     match /companies/{companyId}/financialRecords/{financialRecordId} {
-      allow get, list: if isSignedIn() && isMemberOfCompany(companyId);
-      allow create: if isSignedIn() && isMemberOfCompany(companyId) && request.resource.data.companyId == companyId;
-      allow update: if isSignedIn() && isMemberOfCompany(companyId) && isExistingCompanyDocument(companyId, request.resource.data.companyId);
-      allow delete: if isSignedIn() && isMemberOfCompany(companyId) && isExistingCompanyDocument(companyId, resource.data.companyId);
+      allow get, list: if isSignedIn() && isCompanyMember(companyId);
+      allow create: if isSignedIn() && isCompanyMember(companyId) && request.resource.data.companyId == companyId;
+      allow update, delete: if isSignedIn() && isCompanyMember(companyId) && isExistingCompanyDocument(companyId, resource.data.companyId);
     }
 
     /**
-     * @description Allows read and write access to customers for users within the specified company.
+     * @description Allows company-level access to customer documents.
      * @path /companies/{companyId}/customers/{customerId}
-     * @allow get, list: if isMemberOfCompany(companyId);
-     * @allow create: if isMemberOfCompany(companyId) && request.resource.data.companyId == companyId;
-     * @allow update: if isMemberOfCompany(companyId) && isExistingCompanyDocument(companyId, resource.data.companyId);
-     * @allow delete: if isMemberOfCompany(companyId) && isExistingCompanyDocument(companyId, resource.data.companyId);
-     * @principle Enforces company membership for all operations.
+     * @allow (get, list): if isCompanyMember(companyId)
+     * @allow (create): if isCompanyMember(companyId) && request.resource.data.companyId == companyId
+     * @allow (update, delete): if isCompanyMember(companyId) && isExistingCompanyDocument(companyId, resource.data.companyId)
+     * @deny: if request.auth == null
+     * @principle Enforces that only members of a company can access customer data.
      */
     match /companies/{companyId}/customers/{customerId} {
-      allow get, list: if isSignedIn() && isMemberOfCompany(companyId);
-      allow create: if isSignedIn() && isMemberOfCompany(companyId) && request.resource.data.companyId == companyId;
-      allow update: if isSignedIn() && isMemberOfCompany(companyId) && isExistingCompanyDocument(companyId, request.resource.data.companyId);
-      allow delete: if isSignedIn() && isMemberOfCompany(companyId) && isExistingCompanyDocument(companyId, resource.data.companyId);
+      allow get, list: if isSignedIn() && isCompanyMember(companyId);
+      allow create: if isSignedIn() && isCompanyMember(companyId) && request.resource.data.companyId == companyId;
+      allow update, delete: if isSignedIn() && isCompanyMember(companyId) && isExistingCompanyDocument(companyId, resource.data.companyId);
     }
-  }
 
-  // Helper functions
-  function isSignedIn() {
-    return request.auth != null;
-  }
+        /**
+     * @description Allows company-level access to category documents.
+     * @path /companies/{companyId}/categories/{categoryId}
+     * @allow (get, list): if isCompanyMember(companyId)
+     * @allow (create): if isCompanyMember(companyId) && request.resource.data.companyId == companyId
+     * @allow (update, delete): if isCompanyMember(companyId) && isExistingCompanyDocument(companyId, resource.data.companyId)
+     * @deny: if request.auth == null
+     * @principle Enforces that only members of a company can access category data.
+     */
+    match /companies/{companyId}/categories/{categoryId} {
+      allow get, list: if isSignedIn() && isCompanyMember(companyId);
+      allow create: if isSignedIn() && isCompanyMember(companyId) && request.resource.data.companyId == companyId;
+      allow update, delete: if isSignedIn() && isCompanyMember(companyId) && isExistingCompanyDocument(companyId, resource.data.companyId);
+    }
 
-  function isOwner(userId) {
-    return request.auth.uid == userId;
-  }
 
-  function isExistingOwner(userId) {
-    return isOwner(userId) && get(/databases/$(database)/documents/users/$(userId)).data.keys().size() > 0;
-  }
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
 
-  function isMemberOfCompany(companyId) {
-    return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyId == companyId;
-  }
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
 
-  function isExistingCompanyDocument(companyId, documentCompanyId) {
-        return resource.data.companyId == companyId;
+    function isCompanyMember(companyId) {
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyId == companyId;
+    }
+
+    function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+    }
+
+    function isExistingCompanyDocument(companyId, resourceCompanyId) {
+        return resource != null && resourceCompanyId == companyId;
+    }
   }
 }

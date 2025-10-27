@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -47,14 +47,18 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
+import { collection, doc, serverTimestamp } from 'firebase/firestore';
+import { addDocumentNonBlocking, setDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { Skeleton } from '@/components/ui/skeleton';
 
 type Product = {
-  sku: string;
+  id: string;
   name: string;
   category: string;
   quantity: number;
-  price: string;
-  status: 'Em Estoque' | 'Estoque Baixo' | 'Fora de Estoque';
+  price: number;
+  companyId: string;
 };
 
 type Category = {
@@ -62,54 +66,9 @@ type Category = {
   name: string;
 };
 
-const initialProducts: Product[] = [
-  {
-    name: 'Laptop Pro',
-    sku: 'LP-001',
-    category: 'Eletrônicos',
-    quantity: 25,
-    price: 'R$7500.00',
-    status: 'Em Estoque',
-  },
-  {
-    name: 'Smartphone X',
-    sku: 'SX-002',
-    category: 'Eletrônicos',
-    quantity: 8,
-    price: 'R$3200.00',
-    status: 'Estoque Baixo',
-  },
-  {
-    name: 'Monitor 4K',
-    sku: 'M4K-003',
-    category: 'Eletrônicos',
-    quantity: 15,
-    price: 'R$1800.00',
-    status: 'Em Estoque',
-  },
-  {
-    name: 'Teclado Mecânico',
-    sku: 'TM-004',
-    category: 'Periféricos',
-    quantity: 50,
-    price: 'R$450.00',
-    status: 'Em Estoque',
-  },
-  {
-    name: 'Mouse Gamer',
-    sku: 'MG-005',
-    category: 'Periféricos',
-    quantity: 0,
-    price: 'R$250.00',
-    status: 'Fora de Estoque',
-  },
-];
-
-const initialCategories: Category[] = [
-    { id: 'CAT001', name: 'Eletrônicos' },
-    { id: 'CAT002', name: 'Periféricos' },
-    { id: 'CAT003', name: 'Acessórios' },
-];
+type UserProfile = {
+    companyId: string;
+}
 
 const getStatus = (
   quantity: number
@@ -120,16 +79,36 @@ const getStatus = (
 };
 
 export default function InventoryPage() {
-  const [products, setProducts] = useState<Product[]>(initialProducts);
-  const [categories] = useState<Category[]>(initialCategories);
+    const { user, isUserLoading } = useUser();
+    const firestore = useFirestore();
+
+    const userProfileRef = useMemoFirebase(() => {
+        if (!user) return null;
+        return doc(firestore, 'users', user.uid);
+    }, [firestore, user]);
+
+    const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
+
+    const productsRef = useMemoFirebase(() => {
+        if (!userProfile?.companyId) return null;
+        return collection(firestore, 'companies', userProfile.companyId, 'products');
+    }, [firestore, userProfile]);
+
+    const categoriesRef = useMemoFirebase(() => {
+        if (!userProfile?.companyId) return null;
+        return collection(firestore, 'companies', userProfile.companyId, 'categories');
+    }, [firestore, userProfile]);
+
+    const { data: products, isLoading: isLoadingProducts } = useCollection<Omit<Product, 'id'>>(productsRef);
+    const { data: categories, isLoading: isLoadingCategories } = useCollection<Omit<Category, 'id'>>(categoriesRef);
+
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [formState, setFormState] = useState({
     name: '',
-    sku: '',
     category: '',
     quantity: 0,
-    price: '',
+    price: 0,
   });
 
   const handleOpenDialog = (product: Product | null = null) => {
@@ -137,40 +116,54 @@ export default function InventoryPage() {
     if (product) {
       setFormState({
         name: product.name,
-        sku: product.sku,
         category: product.category,
         quantity: product.quantity,
-        price: product.price.replace('R$', '').replace('.', '').replace(',', '.'),
+        price: product.price,
       });
     } else {
-      setFormState({ name: '', sku: '', category: '', quantity: 0, price: '' });
+      setFormState({ name: '', category: '', quantity: 0, price: 0 });
     }
     setIsDialogOpen(true);
   };
+  
+  const handleCloseDialog = () => {
+    setIsDialogOpen(false);
+    setEditingProduct(null);
+    setFormState({ name: '', category: '', quantity: 0, price: 0 });
+  }
 
-  const handleDelete = (sku: string) => {
-    setProducts(products.filter((p) => p.sku !== sku));
+  const handleDelete = (productId: string) => {
+    if (!productsRef) return;
+    const productDocRef = doc(productsRef, productId);
+    deleteDocumentNonBlocking(productDocRef);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const newProduct: Product = {
+    if (!productsRef || !userProfile?.companyId) return;
+
+    const productData = {
       name: formState.name,
-      sku: editingProduct ? formState.sku : `PROD-${Date.now()}`,
       category: formState.category,
       quantity: Number(formState.quantity),
-      price: `R$${parseFloat(formState.price).toFixed(2).replace('.', ',')}`,
-      status: getStatus(Number(formState.quantity)),
+      price: Number(formState.price),
+      companyId: userProfile.companyId,
     };
 
     if (editingProduct) {
-      setProducts(
-        products.map((p) => (p.sku === editingProduct.sku ? newProduct : p))
-      );
+      const productDocRef = doc(productsRef, editingProduct.id);
+      setDocumentNonBlocking(productDocRef, {
+        ...editingProduct,
+        ...productData,
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
     } else {
-      setProducts([newProduct, ...products]);
+      addDocumentNonBlocking(productsRef, {
+        ...productData,
+        createdAt: serverTimestamp(),
+      });
     }
-    setIsDialogOpen(false);
+    handleCloseDialog();
   };
 
   const handleFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -178,9 +171,11 @@ export default function InventoryPage() {
     setFormState((prev) => ({ ...prev, [id]: value }));
   };
 
-  const handleSelectChange = (id: 'category', value: string) => {
-    setFormState((prev) => ({ ...prev, [id]: value }));
+  const handleSelectChange = (value: string) => {
+    setFormState((prev) => ({ ...prev, category: value }));
   };
+  
+  const isLoading = isUserLoading || isProfileLoading || isLoadingProducts || isLoadingCategories;
 
   return (
     <div className="space-y-6">
@@ -206,7 +201,6 @@ export default function InventoryPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Produto</TableHead>
-                <TableHead>SKU</TableHead>
                 <TableHead>Categoria</TableHead>
                 <TableHead>Quantidade</TableHead>
                 <TableHead>Status</TableHead>
@@ -215,33 +209,44 @@ export default function InventoryPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {products.map((product) => (
-                <TableRow key={product.sku}>
+            {isLoading ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                    <TableRow key={i}>
+                        <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-16" /></TableCell>
+                        <TableCell><Skeleton className="h-6 w-28" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-20" /></TableCell>
+                        <TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
+                    </TableRow>
+                ))
+            ) : products && products.length > 0 ? (
+              products.map((product) => (
+                <TableRow key={product.id}>
                   <TableCell className="font-medium">{product.name}</TableCell>
-                  <TableCell>{product.sku}</TableCell>
                   <TableCell>{product.category}</TableCell>
                   <TableCell>{product.quantity}</TableCell>
                   <TableCell>
                     <Badge
                       variant={
-                        product.status === 'Em Estoque'
+                        getStatus(product.quantity) === 'Em Estoque'
                           ? 'default'
-                          : product.status === 'Estoque Baixo'
+                          : getStatus(product.quantity) === 'Estoque Baixo'
                           ? 'secondary'
                           : 'destructive'
                       }
                       className={
-                        product.status === 'Em Estoque'
+                        getStatus(product.quantity) === 'Em Estoque'
                           ? 'bg-green-600'
-                          : product.status === 'Estoque Baixo'
+                          : getStatus(product.quantity) === 'Estoque Baixo'
                           ? 'bg-yellow-500'
                           : ''
                       }
                     >
-                      {product.status}
+                      {getStatus(product.quantity)}
                     </Badge>
                   </TableCell>
-                  <TableCell>{product.price}</TableCell>
+                  <TableCell>{product.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -278,7 +283,7 @@ export default function InventoryPage() {
                             <AlertDialogFooter>
                               <AlertDialogCancel>Cancelar</AlertDialogCancel>
                               <AlertDialogAction
-                                onClick={() => handleDelete(product.sku)}
+                                onClick={() => handleDelete(product.id)}
                                 className="bg-destructive hover:bg-destructive/90"
                               >
                                 Excluir
@@ -290,7 +295,14 @@ export default function InventoryPage() {
                     </DropdownMenu>
                   </TableCell>
                 </TableRow>
-              ))}
+              ))
+              ) : (
+                <TableRow>
+                    <TableCell colSpan={6} className="text-center h-24">
+                        Nenhum produto encontrado.
+                    </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </CardContent>
@@ -318,36 +330,27 @@ export default function InventoryPage() {
                 />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="sku" className="text-right">
-                  SKU
-                </Label>
-                <Input
-                  id="sku"
-                  value={formState.sku}
-                  onChange={handleFormChange}
-                  className="col-span-3"
-                  required
-                  disabled={!!editingProduct}
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
                  <Label htmlFor="category" className="text-right">
                    Categoria
                  </Label>
                  <Select
                    value={formState.category}
-                   onValueChange={(value) => handleSelectChange('category', value)}
+                   onValueChange={handleSelectChange}
                    required
                  >
                    <SelectTrigger className="col-span-3">
                      <SelectValue placeholder="Selecione uma categoria" />
                    </SelectTrigger>
                    <SelectContent>
-                     {categories.map((category) => (
-                       <SelectItem key={category.id} value={category.name}>
-                         {category.name}
-                       </SelectItem>
-                     ))}
+                     {isLoadingCategories ? (
+                        <SelectItem value="loading" disabled>Carregando...</SelectItem>
+                     ) : (
+                        categories?.map((category) => (
+                            <SelectItem key={category.id} value={category.name}>
+                                {category.name}
+                            </SelectItem>
+                        ))
+                     )}
                    </SelectContent>
                  </Select>
                </div>
@@ -381,7 +384,7 @@ export default function InventoryPage() {
             </div>
             <DialogFooter>
               <DialogClose asChild>
-                <Button type="button" variant="secondary">
+                <Button type="button" variant="secondary" onClick={handleCloseDialog}>
                   Cancelar
                 </Button>
               </DialogClose>

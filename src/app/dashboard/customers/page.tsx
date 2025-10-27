@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -22,7 +22,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogFooter,
   DialogClose,
 } from '@/components/ui/dialog';
@@ -45,27 +44,45 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { PlusCircle, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Pencil, Trash2, Loader2 } from 'lucide-react';
+import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { collection, doc } from 'firebase/firestore';
+import { addDocumentNonBlocking, setDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { Skeleton } from '@/components/ui/skeleton';
 
 type Customer = {
   id: string;
   name: string;
   email: string;
   phone: string;
-  totalSpent: string;
+  totalSpent: number;
+  companyId: string;
 };
 
-const initialCustomers: Customer[] = [
-  { id: 'CUST001', name: 'Liam Johnson', email: 'liam@example.com', phone: '(11) 98765-4321', totalSpent: 'R$250.00' },
-  { id: 'CUST002', name: 'Olivia Smith', email: 'olivia@example.com', phone: '(21) 91234-5678', totalSpent: 'R$150.00' },
-  { id: 'CUST003', name: 'Noah Williams', email: 'noah@example.com', phone: '(31) 99999-8888', totalSpent: 'R$350.00' },
-  { id: 'CUST004', name: 'Emma Brown', email: 'emma@example.com', phone: '(41) 98888-7777', totalSpent: 'R$450.00' },
-  { id: 'CUST005', name: 'James Jones', email: 'james@example.com', phone: '(51) 97777-6666', totalSpent: 'R$550.00' },
-];
-
-
 export default function CustomersPage() {
-    const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
+    const { user, isUserLoading } = useUser();
+    const firestore = useFirestore();
+    const [userProfile, setUserProfile] = useState<{ companyId?: string } | null>(null);
+
+    // Mock para perfil de usuário, idealmente viria de um 'useProfile' hook
+    // Simulando que o perfil é carregado após o usuário ser identificado
+    useState(() => {
+      if (user) {
+        // Em um app real, você buscaria o perfil do usuário do Firestore aqui.
+        // Por agora, vamos simular que o usuário pertence a uma 'company-1'
+        setTimeout(() => setUserProfile({ companyId: 'company-1' }), 500);
+      } else {
+        setUserProfile(null);
+      }
+    });
+
+    const customersRef = useMemoFirebase(() => {
+        if (!userProfile?.companyId) return null;
+        return collection(firestore, 'companies', userProfile.companyId, 'customers');
+    }, [firestore, userProfile]);
+
+    const { data: customers, isLoading: isLoadingCustomers } = useCollection<Omit<Customer, 'id'>>(customersRef);
+    
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
     const [formState, setFormState] = useState({ name: '', email: '', phone: '' });
@@ -80,26 +97,35 @@ export default function CustomersPage() {
         setIsDialogOpen(true);
     };
 
-    const handleDelete = (id: string) => {
-        setCustomers(customers.filter((c) => c.id !== id));
+    const handleDelete = (customerId: string) => {
+        if (!customersRef) return;
+        const customerDocRef = doc(customersRef, customerId);
+        deleteDocumentNonBlocking(customerDocRef);
     };
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        const newCustomer: Customer = {
-            id: editingCustomer ? editingCustomer.id : `CUST-${Date.now()}`,
-            name: formState.name,
-            email: formState.email,
-            phone: formState.phone,
-            totalSpent: editingCustomer ? editingCustomer.totalSpent : 'R$0.00',
+        if (!customersRef) return;
+
+        const customerData = {
+          name: formState.name,
+          email: formState.email,
+          phone: formState.phone,
+          companyId: userProfile?.companyId || '',
         };
 
         if (editingCustomer) {
-            setCustomers(
-                customers.map((c) => (c.id === editingCustomer.id ? newCustomer : c))
-            );
+            const customerDocRef = doc(customersRef, editingCustomer.id);
+            setDocumentNonBlocking(customerDocRef, {
+              ...editingCustomer,
+              ...customerData
+            }, { merge: true });
         } else {
-            setCustomers([newCustomer, ...customers]);
+            addDocumentNonBlocking(customersRef, {
+              ...customerData,
+              totalSpent: 0,
+              createdAt: new Date(),
+            });
         }
         setIsDialogOpen(false);
     };
@@ -108,6 +134,8 @@ export default function CustomersPage() {
         const { id, value } = e.target;
         setFormState((prev) => ({ ...prev, [id]: value }));
     };
+
+    const isLoading = isUserLoading || isLoadingCustomers;
 
   return (
     <div className="space-y-6">
@@ -135,12 +163,23 @@ export default function CustomersPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {customers.map((customer) => (
+              {isLoading ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <TableRow key={i}>
+                    <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-48" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
+                  </TableRow>
+                ))
+              ) : customers && customers.length > 0 ? (
+                customers.map((customer) => (
                 <TableRow key={customer.id}>
                   <TableCell className="font-medium">{customer.name}</TableCell>
                   <TableCell>{customer.email}</TableCell>
                   <TableCell>{customer.phone}</TableCell>
-                  <TableCell>{customer.totalSpent}</TableCell>
+                  <TableCell>{customer.totalSpent.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
                   <TableCell className="text-right">
                   <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -189,7 +228,14 @@ export default function CustomersPage() {
                     </DropdownMenu>
                   </TableCell>
                 </TableRow>
-              ))}
+              ))
+              ) : (
+                <TableRow>
+                    <TableCell colSpan={5} className="text-center h-24">
+                        Nenhum cliente encontrado.
+                    </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </CardContent>
@@ -255,3 +301,5 @@ export default function CustomersPage() {
     </div>
   );
 }
+
+    
